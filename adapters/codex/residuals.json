@@ -55,6 +55,7 @@
     "lib/host.mjs": { "kind": "extra", "category": "host-runtime", "reason": "resolveHost() and the claude-code, codex and cursor protocols" },
     "lib/host-default.mjs": { "kind": "extra", "category": "host-runtime", "reason": "the emitted default host (codex) when no host signal is present" },
     "test/lib/host.test.mjs": { "kind": "extra", "category": "host-runtime", "reason": "unit tests for lib/host.mjs" },
+    "test/lib/hook-runtime-symlink.test.mjs": { "kind": "extra", "category": "host-runtime", "reason": "runs the gate through a symlinked plugin path and proves it fires" },
 
     "lib/tokenizer.mjs": { "kind": "content", "category": "tokenizer-verbatim", "reason": "three comment sentences; code identical" },
 

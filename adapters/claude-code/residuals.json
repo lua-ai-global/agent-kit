@@ -3,5 +3,11 @@
     "kit-fix": "A bug fixed in the kit. The live claude-code-lua-plugin is being sunset and is never patched, so the fix shows up here as a declared difference from the 1.16.0 baseline.",
     "kit-consistency": "One canonical value or rule for every host, decided in the kit (see NOTES.md)."
   },
-  "residuals": {}
+  "residuals": {
+    "plugins/lua-agent-builder/lib/hook-runtime.mjs": { "kind": "content", "category": "kit-fix", "reason": "one multi-host runtime on every host; isMainScript compares real paths, so a plugin path through a symlink no longer turns every hook, the deploy gate included, into a no-op" },
+    "plugins/lua-agent-builder/lib/host.mjs": { "kind": "extra", "category": "kit-fix", "reason": "resolveHost() and the per-host protocols the shared runtime renders through" },
+    "plugins/lua-agent-builder/lib/host-default.mjs": { "kind": "extra", "category": "kit-fix", "reason": "the emitted default host (claude-code) and its empty fail-closed list" },
+    "plugins/lua-agent-builder/test/lib/host.test.mjs": { "kind": "extra", "category": "kit-fix", "reason": "unit tests for lib/host.mjs" },
+    "plugins/lua-agent-builder/test/lib/hook-runtime-symlink.test.mjs": { "kind": "extra", "category": "kit-fix", "reason": "runs the gate through a symlinked plugin path and proves it fires" }
+  }
 }

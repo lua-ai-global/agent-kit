@@ -12,7 +12,7 @@ import {
   checkNodeVersion,
   emitContext,
   isCursorRuntime,
-} from '../../lib/host-runtime.mjs';
+} from '../../lib/hook-runtime.mjs';
 
 describe('readStdin', () => {
   let originalStdin;

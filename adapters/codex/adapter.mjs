@@ -22,6 +22,7 @@ export const mounts = [
   { from: 'packages/core/lib/tokenizer.mjs', to: 'lib/tokenizer.mjs' },
   { from: 'packages/core/lib/credentials.mjs', to: 'lib/credentials.mjs' },
   { from: 'packages/core/lib/host.mjs', to: 'lib/host.mjs' },
+  { from: 'packages/core/lib/hook-runtime.mjs', to: 'lib/hook-runtime.mjs' },
   { from: 'packages/core/test/hooks', to: 'test/hooks', exclude: ['block-auth-configure.test.mjs'] },
   { from: 'packages/core/test/lib', to: 'test/lib', exclude: ['hook-runtime.test.mjs'] },
   { from: 'packages/core/test/helpers', to: 'test/helpers' },
@@ -69,7 +70,6 @@ export function generate({ root, version }) {
   if (unused.length) throw new Error(`codex glossary has entries for paths that are not emitted: ${unused.join(', ')}`);
   return [
     ...out,
-    { path: 'lib/hook-runtime.mjs', content: readFileSync(join(root, 'packages', 'core', 'lib', 'host-runtime.mjs'), 'utf8') },
     { path: 'lib/host-default.mjs', content: hostDefault(root, profile.defaultHost) },
     { path: 'lib/permissions-template.json', content: renderPermissionsTemplate(root, 'codex') },
     { path: 'hooks/hooks.json', content: renderHooksJson(root, profile) },

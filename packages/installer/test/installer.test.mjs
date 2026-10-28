@@ -132,6 +132,23 @@ describe('install', () => {
     assert.equal(report.hub.current, VERSION);
   });
 
+  test('the gate fires whether the plugin is reached through the real version path or the current symlink', () => {
+    const box = sandbox('symlinked-gate');
+    cli(box, ['install', '--agent', 'claude-code,codex', '--yes']);
+    const roots = [
+      ['claude-code', join(box.kit, VERSION, 'claude-code', 'plugins', 'lua-agent-builder'), { CLAUDE_PLUGIN_ROOT: '1' }],
+      ['claude-code', join(box.kit, 'current', 'claude-code', 'plugins', 'lua-agent-builder'), { CLAUDE_PLUGIN_ROOT: '1' }],
+      ['codex', join(box.kit, 'current', 'codex'), { PLUGIN_ROOT: '1' }],
+    ];
+    for (const [host, root, env] of roots) {
+      const r = spawnSync(process.execPath, [join(root, 'hooks', 'confirm-deploy.mjs')], {
+        input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'lua deploy all' } }),
+        encoding: 'utf8', env: { PATH: process.env.PATH, HOME: box.home, ...env },
+      });
+      assert.equal(r.status, 2, `${host} via ${root}: ${r.stderr}`);
+    }
+  });
+
   test('a user-authored skill directory is reported and never touched', () => {
     const box = sandbox('collision');
     const mine = join(box.home, '.claude', 'skills', 'lua-deploy');

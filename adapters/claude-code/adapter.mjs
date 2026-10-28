@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  readSkill, renderHooksJson, renderManifest, renderMcpJson, renderPermissionsTemplate, skillNames, skillToCommand,
+  hostDefault, readSkill, renderHooksJson, renderManifest, renderMcpJson, renderPermissionsTemplate, skillNames, skillToCommand,
 } from '../../build/generators.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -16,7 +16,8 @@ export const mounts = [
   { from: 'adapters/claude-code/templates/repo', to: '.' },
   { from: 'adapters/claude-code/templates/plugin', to: PLUGIN },
   { from: 'src/docs/JOB_TIER.md', to: 'docs/JOB_TIER.md' },
-  { from: 'packages/core/lib', to: `${PLUGIN}/lib`, exclude: ['host.mjs', 'host-runtime.mjs', 'host-default.mjs'] },
+  { from: 'packages/core/lib', to: `${PLUGIN}/lib`, exclude: ['host-default.mjs'] },
+  { from: 'packages/core/test/host/host.test.mjs', to: `${PLUGIN}/test/lib/host.test.mjs` },
   { from: 'packages/core/hooks', to: `${PLUGIN}/hooks`, exclude: ['before-shell-execution.mjs'] },
   { from: 'packages/core/test/hooks', to: `${PLUGIN}/test/hooks`, exclude: ['before-shell-execution.test.mjs'] },
   { from: 'packages/core/test/lib', to: `${PLUGIN}/test/lib` },
@@ -40,6 +41,7 @@ export function generate({ root, version }) {
   }));
   return [
     ...commands,
+    { path: `${PLUGIN}/lib/host-default.mjs`, content: hostDefault(root, 'claude-code') },
     { path: `${PLUGIN}/lib/permissions-template.json`, content: renderPermissionsTemplate(root, 'claude-code') },
     { path: `${PLUGIN}/hooks/hooks.json`, content: renderHooksJson(root, profile) },
     { path: `${PLUGIN}/.mcp.json`, content: renderMcpJson(root, profile) },

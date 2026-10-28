@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
 import { spawnSync } from 'node:child_process';
-import { cpSync, copyFileSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +18,6 @@ beforeAll(() => {
   plugin = realpathSync(mkdtempSync(join(tmpdir(), 'lua-kit-host-')));
   cpSync(join(CORE, 'hooks'), join(plugin, 'hooks'), { recursive: true });
   cpSync(join(CORE, 'lib'), join(plugin, 'lib'), { recursive: true });
-  copyFileSync(join(CORE, 'lib', 'host-runtime.mjs'), join(plugin, 'lib', 'hook-runtime.mjs'));
   writeFileSync(join(plugin, 'lib', 'host-default.mjs'), "export const DEFAULT_HOST = 'codex';\nexport const FAIL_CLOSED_HOOKS = ['confirm-deploy'];\n");
 });
 

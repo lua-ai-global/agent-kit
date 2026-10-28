@@ -1,24 +1,22 @@
-// Per tech spec §17.1 / §17.1.1.
-// Common skeleton for every hooks/*.mjs. Each hook exports its `decide`
-// function so unit tests can import and call directly. The script-vs-import
-// guard at the bottom of each hook file ensures `runHook` only fires when
-// the hook is invoked by Claude Code, never during a test import.
-
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { isHeadless } from './headless.mjs';
+import { normaliseInput, render, resolveHost } from './host.mjs';
+import { DEFAULT_HOST, FAIL_CLOSED_HOOKS } from './host-default.mjs';
 
 const REQUIRED_NODE_MAJOR = 18;
 
-/**
- * Defensive runtime check (§21.1) — catches users who bypass `npm ci`'s
- * engine-strict gate (e.g. installing via `lua claude-plugin install` from
- * a Path B distribution onto a stale Node).
- *
- * Called explicitly from each hook's entry section, not at module load —
- * loading this file during a test on too-old-Node would kill the test
- * process. Tests run on whatever Node CI provides; that's their concern.
- */
+export const log = {
+  toClaudeCode(message) {
+    process.stderr.write(message.endsWith('\n') ? message : `${message}\n`);
+  },
+};
+
+export function exit(code) {
+  process.stderr.write('', () => process.exit(code));
+}
+
 export function checkNodeVersion() {
   const major = parseInt(process.versions.node.split('.')[0], 10);
   if (major < REQUIRED_NODE_MAJOR) {
@@ -27,18 +25,15 @@ export function checkNodeVersion() {
       `You have ${process.versions.node}. ` +
       (isHeadless() ? 'The plugin hooks are inactive in this run.' : 'Update Node and re-run /lua-doctor.')
     );
-    exit(0);  // Fail-open per §6.1
+    exit(0);
   }
 }
 
-/**
- * Read the JSON-encoded tool input that Claude Code sends to PreToolUse /
- * PostToolUse hooks via stdin. Returns the parsed object, or null if stdin
- * is empty (SessionStart / Stop hooks have no input payload).
- *
- * @returns {Promise<object|null>}
- */
-export async function readStdin() {
+export function isCursorRuntime(input) {
+  return resolveHost(process.env, input, DEFAULT_HOST) === 'cursor';
+}
+
+async function readRawStdin() {
   if (process.stdin.isTTY) return null;
   const chunks = [];
   for await (const chunk of process.stdin) chunks.push(chunk);
@@ -46,126 +41,54 @@ export async function readStdin() {
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
-export const log = {
-  /**
-   * Write to stderr. Claude Code surfaces stderr from a hook ONLY when the
-   * hook also exits with code 2 (block); for exit 0 the stderr is logged
-   * silently and never reaches the model. Use `emitContext()` instead when
-   * you want to inject information into Claude's context.
-   */
-  toClaudeCode(message) {
-    process.stderr.write(message.endsWith('\n') ? message : `${message}\n`);
-  },
-};
+export async function readStdin() {
+  return normaliseInput(await readRawStdin());
+}
 
-// Iteration-13 audit: every "warn" path was previously written to stderr +
-// exit 0, which Claude Code logs silently and never injects into the model
-// (verified against https://code.claude.com/docs/en/hooks.md). The
-// documented non-blocking context-injection protocol is JSON-on-stdout
-// shaped `{ hookSpecificOutput: { hookEventName, additionalContext } }`,
-// supported on SessionStart, UserPromptSubmit, and PostToolUse. PreToolUse
-// uses the same envelope (the hook still allows the tool, but the warning
-// becomes visible to Claude). Without this fix, "Lua project detected",
-// "[lua] agent: <id>", "✓ Compiled N primitives", and the post-deploy
-// smoke warnings all silently dropped.
-
-// Per https://code.claude.com/docs/en/hooks.md, these are the events that
-// support the `hookSpecificOutput.additionalContext` envelope. Stop is
-// notably absent — it only supports `decision: "block"`. SessionEnd
-// supports the envelope per the iteration-13 follow-up confirmation.
-const CONTEXT_EVENTS = new Set([
-  'SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse',
-]);
-
-/**
- * Emit a JSON `hookSpecificOutput` envelope on stdout so Claude Code injects
- * the message into the model's context. Caller still must `exit(0)` after.
- */
 export function emitContext(hookEventName, additionalContext) {
-  if (!CONTEXT_EVENTS.has(hookEventName)) {
-    // Unknown event — fall back to stderr so we at least surface in logs.
-    process.stderr.write(`⚠ ${additionalContext}\n`);
-    return;
+  write(render(resolveHost(process.env, null, DEFAULT_HOST), { warn: additionalContext }, { eventName: hookEventName }));
+}
+
+function canonical(path) {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
   }
-  process.stdout.write(JSON.stringify({
-    hookSpecificOutput: { hookEventName, additionalContext },
-  }) + '\n');
 }
 
-/**
- * Exit with a Claude-Code-meaningful code.
- *   0 — allow the tool call
- *   2 — block the tool call (stderr surfaced as the reason)
- *   any other — treated as fail-open (allow) per §6.1
- *
- * Explicit stderr flush via empty write+callback: Windows can drop the last
- * line otherwise.
- */
-export function exit(code) {
-  process.stderr.write('', () => process.exit(code));
-}
-
-/**
- * True iff this module is the entry point for the Node process (script
- * invocation), false when it's been `import`-ed from another module.
- *
- * Cross-platform: resolves both sides to absolute paths so Windows
- * (forward-slash file:// URL vs back-slash argv[1]) and POSIX agree.
- *
- * @param {string} importMetaUrl - pass `import.meta.url` from the calling module
- */
 export function isMainScript(importMetaUrl) {
   if (!process.argv[1]) return false;
   try {
-    return resolve(fileURLToPath(importMetaUrl)) === resolve(process.argv[1]);
+    return canonical(fileURLToPath(importMetaUrl)) === canonical(resolve(process.argv[1]));
   } catch {
     return false;
   }
 }
 
-/**
- * Wrap a hook's main logic with fail-open error handling. A hook with a
- * runtime bug must not lock the user out of the plugin (§6.1).
- *
- * @param {string} hookName  Used for error messages only.
- * @param {(input: object|null) => Promise<{block?: boolean, reason?: string, warn?: string}|null> | {block?: boolean, reason?: string, warn?: string}|null} decideFn
- * @param {{eventName?: string}} [opts] eventName is one of SessionStart |
- *   UserPromptSubmit | PreToolUse | PostToolUse — required for the warn
- *   path to surface in Claude's context (the JSON envelope needs it).
- */
+function write(output) {
+  if (output.stdout) process.stdout.write(output.stdout);
+  if (output.stderr) process.stderr.write(output.stderr);
+}
+
 export async function runHook(hookName, decideFn, { eventName } = {}) {
   try {
-    const input = await readStdin();
-    const decision = await decideFn(input);
-    if (decision?.block) {
-      log.toClaudeCode(decision.reason ?? `Blocked by ${hookName}.`);
-      exit(2);
-      /* istanbul ignore next */ return;  // defensive: exit() doesn't return in production
-    }
-    if (decision?.allow && eventName === 'PreToolUse') {
-      // Documented PreToolUse decision envelope: skips the permission prompt
-      // for this one call; deny/ask rules still win over it.
-      process.stdout.write(JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: 'PreToolUse',
-          permissionDecision: 'allow',
-          permissionDecisionReason: decision.reason ?? `Approved by ${hookName}.`,
-        },
-      }) + '\n');
-      exit(0);
-      /* istanbul ignore next */ return;
-    }
-    if (decision?.warn) {
-      if (eventName) {
-        emitContext(eventName, decision.warn);
-      } else {
-        // Fall back to stderr — undocumented behaviour, but better than
-        // silent drop in case a hook author forgot the eventName parameter.
-        log.toClaudeCode(`⚠ ${decision.warn}`);
-      }
-    }
-    exit(0);
+    const raw = await readRawStdin();
+    const host = resolveHost(process.env, raw, DEFAULT_HOST);
+    const input = normaliseInput(raw);
+    const output = render(host, await decideFn(input), { hookName, eventName, input });
+    write(output);
+    exit(output.code);
   } catch (err) {
+    if (FAIL_CLOSED_HOOKS.includes(hookName)) {
+      const output = render(resolveHost(process.env, null, DEFAULT_HOST), {
+        block: true,
+        reason: `Hook ${hookName} error: ${err.message}. Blocking the command, because this hook is the deploy gate (fail-closed).`,
+      }, { hookName });
+      write(output);
+      exit(output.code);
+      return;
+    }
     log.toClaudeCode(`Hook ${hookName} error: ${err.message}. Allowing the tool call (fail-open).`);
     exit(0);
   }

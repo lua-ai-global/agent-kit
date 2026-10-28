@@ -14,7 +14,7 @@
   "scripts": {
     "emit": "node build/emit.mjs --all",
     "check:claude": "node build/check-claude.mjs",
-    "lint": "eslint --ext .mjs build test tools/derive-glossary.mjs adapters packages/installer packages/core/lib/host.mjs packages/core/lib/host-runtime.mjs packages/core/lib/host-default.mjs packages/core/test/host",
+    "lint": "eslint --ext .mjs build test tools/derive-glossary.mjs adapters packages/installer packages/core/lib/host.mjs packages/core/lib/hook-runtime.mjs packages/core/lib/host-default.mjs packages/core/test/host packages/core/test/lib/hook-runtime-symlink.test.mjs",
     "test:core": "npm --workspace packages/core run test:coverage",
     "test:installer": "npm --workspace packages/installer test",
     "test:dist": "node --test test/*.test.mjs",
