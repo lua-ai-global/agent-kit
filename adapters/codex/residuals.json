@@ -62,6 +62,7 @@
     "hooks/hooks.json": { "kind": "content", "category": "kit-consistency", "reason": "one timeout per hook on every host: check-lua-auth 20 s (was 15 s here, 20 s on Claude Code)" },
     "test/lib/hook-runtime.test.mjs": { "kind": "content", "category": "kit-fix", "reason": "the parity runtime test, now from core; a Cursor warning asks instead of allowing, so the expectation changed from allow to ask" },
     "lib/lua-bin.mjs": { "kind": "extra", "category": "kit-fix", "reason": "the one pattern for a lua-cli invocation under any of its names" },
+    "test/lib/hook-runtime.failure.test.mjs": { "kind": "extra", "category": "host-runtime", "reason": "covers the fail-open and fail-closed paths of the shared runtime in process" },
     "test/lib/hook-runtime-symlink.test.mjs": { "kind": "extra", "category": "host-runtime", "reason": "runs the gate through a symlinked plugin path and proves it fires" },
 
     "lib/tokenizer.mjs": { "kind": "content", "category": "tokenizer-verbatim", "reason": "three comment sentences; code identical" },

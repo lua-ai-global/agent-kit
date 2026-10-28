@@ -12,6 +12,7 @@
     "plugins/lua-agent-builder/lib/lua-bin.mjs": { "kind": "extra", "category": "kit-fix", "reason": "the one pattern for a lua-cli invocation under any of its names, shared by the credential hooks" },
     "plugins/lua-agent-builder/test/hooks/block-auth-configure.aliases.test.mjs": { "kind": "extra", "category": "kit-fix", "reason": "every alias, launcher and path form is blocked; the alias list is checked against the deploy classifier" },
     "plugins/lua-agent-builder/hooks/hooks.json": { "kind": "content", "category": "kit-consistency", "reason": "one timeout per hook on every host: confirm-deploy 30 s (was 10 s here, 30 s on Codex), because a timed-out gate fails open" },
+    "plugins/lua-agent-builder/test/lib/hook-runtime.failure.test.mjs": { "kind": "extra", "category": "kit-fix", "reason": "covers the fail-open and fail-closed paths of the shared runtime in process, so lib/hook-runtime.mjs keeps the 90% statement floor" },
     "plugins/lua-agent-builder/test/lib/hook-runtime-symlink.test.mjs": { "kind": "extra", "category": "kit-fix", "reason": "runs the gate through a symlinked plugin path and proves it fires" }
   }
 }

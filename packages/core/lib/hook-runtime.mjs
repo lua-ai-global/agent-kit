@@ -80,16 +80,18 @@ export async function runHook(hookName, decideFn, { eventName } = {}) {
     write(output);
     exit(output.code);
   } catch (err) {
-    if (FAIL_CLOSED_HOOKS.includes(hookName)) {
-      const output = render(resolveHost(process.env, null, DEFAULT_HOST), {
-        block: true,
-        reason: `Hook ${hookName} error: ${err.message}. Blocking the command, because this hook is the deploy gate (fail-closed).`,
-      }, { hookName });
-      write(output);
-      exit(output.code);
-      return;
-    }
-    log.toClaudeCode(`Hook ${hookName} error: ${err.message}. Allowing the tool call (fail-open).`);
-    exit(0);
+    const output = failureOutput(hookName, err, { host: resolveHost(process.env, null, DEFAULT_HOST) });
+    write(output);
+    exit(output.code);
   }
+}
+
+export function failureOutput(hookName, err, { host, failClosed = FAIL_CLOSED_HOOKS }) {
+  if (!failClosed.includes(hookName)) {
+    return { stderr: `Hook ${hookName} error: ${err.message}. Allowing the tool call (fail-open).\n`, code: 0 };
+  }
+  return render(host, {
+    block: true,
+    reason: `Hook ${hookName} error: ${err.message}. Blocking the command, because this hook is the deploy gate (fail-closed).`,
+  }, { hookName });
 }
