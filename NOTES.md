@@ -74,7 +74,17 @@ Fixed in the kit after JM's decision that the live plugins are sunset (each is a
 
 ## Cross-adapter lint
 
-`build/parity.mjs` implements clauses 1 (one tokenizer, byte-identical in every tree), 5 (no foreign host token in shipped files) and 6 (no dropped skill or rule) of the scope's seven. Clauses 2 (one rules digest), 3 (every gated verb enforced or waived per host), 4 (no bare production verb or `--auto-deploy` in any output) and 7 (permissions-mirror against every adapter) are not built yet; the Claude and Codex trees each still run their own `permissions-mirror` test.
+`build/parity.mjs` runs all seven clauses over `dist/` and prints the `rules.json` digest; `test/parity.test.mjs` proves each new clause fails on injected drift.
+
+1. Every tree's `lib/tokenizer.mjs` is byte-identical to core's.
+2. Every emitted permission template equals `src/permissions/rules.json` filtered for its host, tier by tier.
+3. Every production verb in the tokenizer (`PRODUCTION_COMMANDS`) is blocked by the emitted hooks of Claude Code, Codex and Cursor, imported from each tree; on the universal tree it must be named in the Tier C notice (the waiver in `src/permissions/waivers.json`).
+4. No `` `Bash(…)` `` command in any skill, agent or rule runs a bare production verb or `--auto-deploy`. Permission-rule examples (with `*`) and placeholder syntax the classifier cannot resolve are skipped.
+5. No foreign host token in shipped files.
+6. No dropped skill or rule.
+7. Every tree with a permission template ships `test/lib/permissions-mirror.test.mjs`, and on the hook-only hosts (Codex, Cursor) every deny-tier row is enforced by a registered hook, except `Bash(heylua *)` and `Bash(lua-ai *)`, waived with a reason in `src/permissions/waivers.json` because the hooks match those names per verb.
+
+Not built: compiling Codex ask-tier rows into a PermissionRequest hook or a deny-with-instruction. Today the ask tier on Codex falls to Codex's own approval prompt.
 
 ## Deferred
 

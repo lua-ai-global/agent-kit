@@ -1,0 +1,7 @@
+{
+  "hookOnlyHosts": {
+    "Bash(heylua *)": "Codex and Cursor have no permission file to deny a whole binary; the hooks match heylua and lua-ai by name (lib/lua-bin.mjs, the tokenizer's binary table) for every credential and production verb instead",
+    "Bash(lua-ai *)": "Codex and Cursor have no permission file to deny a whole binary; the hooks match heylua and lua-ai by name (lib/lua-bin.mjs, the tokenizer's binary table) for every credential and production verb instead"
+  },
+  "tierC": "Tier C hosts run no hook; every gated verb is named in the Tier C notice at the top of every universal skill, which tells the model to print the confirmed command and stop"
+}
