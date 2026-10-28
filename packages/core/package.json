@@ -1,0 +1,27 @@
+{
+  "name": "@lua-ai-global/agent-kit-core",
+  "version": "1.16.0",
+  "description": "Host-neutral safety core of the Lua Agent Builder: the command tokenizer, the hook decide() modules and the per-host hook protocols",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "exports": {
+    "./host": "./lib/host.mjs",
+    "./tokenizer": "./lib/tokenizer.mjs",
+    "./credentials": "./lib/credentials.mjs",
+    "./headless": "./lib/headless.mjs",
+    "./platform": "./lib/platform.mjs",
+    "./lua-cli": "./lib/lua-cli.mjs",
+    "./hooks/*": "./hooks/*.mjs"
+  },
+  "files": [
+    "lib",
+    "hooks"
+  ],
+  "scripts": {
+    "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js",
+    "test:coverage": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --coverage"
+  }
+}
