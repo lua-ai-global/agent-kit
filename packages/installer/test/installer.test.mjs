@@ -158,6 +158,39 @@ describe('install', () => {
   });
 });
 
+describe('cursor', () => {
+  test('writes hooks.json and mcp.json pointing at the hub, doctor shows Tier B with a passing gate, uninstall removes them', () => {
+    const box = sandbox('cursor');
+    const r = cli(box, ['install', '--agent', 'cursor', '--yes']);
+    assert.equal(r.code, 0, r.err + r.out);
+    const hooks = JSON.parse(readFileSync(join(box.home, '.cursor', 'hooks.json'), 'utf8'));
+    const gate = hooks.hooks.beforeShellExecution.find((h) => h.command.includes('confirm-deploy'));
+    assert.equal(gate.failClosed, true);
+    assert.ok(gate.command.includes(join(box.kit, VERSION, 'cursor', 'hooks', 'confirm-deploy.mjs')));
+    assert.equal(lstatSync(join(box.home, '.cursor', 'skills', 'lua-deploy')).isSymbolicLink(), true);
+    const report = JSON.parse(cli(box, ['doctor', '--json']).out);
+    const cursor = report.hosts.find((h) => h.id === 'cursor');
+    assert.equal(cursor.tier, 'B');
+    assert.equal(cursor.plugin.gate.ok, true);
+    const up = cli(box, ['update'], { LUA_AGENT_KIT_PAYLOAD: nextPayload });
+    assert.equal(up.code, 0, up.err);
+    assert.match(readFileSync(join(box.home, '.cursor', 'hooks.json'), 'utf8'), /agent-kit\/99\.0\.0\/cursor/);
+    cli(box, ['uninstall']);
+    assert.equal(existsSync(join(box.home, '.cursor')), false);
+  });
+
+  test('an existing hooks.json is never edited; the rendered file is offered instead', () => {
+    const box = sandbox('cursor-mine');
+    mkdirSync(join(box.home, '.cursor'), { recursive: true });
+    writeFileSync(join(box.home, '.cursor', 'hooks.json'), '{"version":1,"hooks":{}}\n');
+    const r = cli(box, ['install', '--agent', 'cursor', '--yes']);
+    assert.match(r.out, /merge .*rendered-hooks\.json/);
+    assert.equal(readFileSync(join(box.home, '.cursor', 'hooks.json'), 'utf8'), '{"version":1,"hooks":{}}\n');
+    const cursor = JSON.parse(cli(box, ['doctor', '--json']).out).hosts.find((h) => h.id === 'cursor');
+    assert.equal(cursor.tier, 'C');
+  });
+});
+
 describe('update and rollback', () => {
   test('update re-points the hub, re-registers the plugins, and --to rolls back', () => {
     const box = sandbox('update');

@@ -76,6 +76,33 @@ export function renderMcpJson(root, profile) {
   return formatJson({ mcpServers }, profile.mcpStyle);
 }
 
+export function hostDefault(root, host) {
+  const registry = readJson(root, 'src/hooks/registry.json');
+  const failClosed = registry.failClosed?.[host] ?? [];
+  return `export const DEFAULT_HOST = '${host}';\nexport const FAIL_CLOSED_HOOKS = ${JSON.stringify(failClosed)};\n`;
+}
+
+function cursorHandler(entry, failClosed) {
+  const handler = { command: `node "{{PLUGIN_ROOT}}/hooks/${entry.module}.mjs"`, timeout: entry.timeoutBy?.cursor ?? Math.max(entry.timeout, 10) };
+  if (failClosed.includes(entry.module)) handler.failClosed = true;
+  return handler;
+}
+
+export function renderCursorHooks(root) {
+  const registry = readJson(root, 'src/hooks/registry.json');
+  const failClosed = registry.failClosed?.cursor ?? [];
+  const hooks = {};
+  for (const [event, ids] of Object.entries(registry.hosts.cursor)) {
+    hooks[event] = ids.map((id) => cursorHandler(registry.entries[id], failClosed));
+  }
+  return formatJson({ version: 1, hooks }, { inlineLeafObjectsInArrays: true });
+}
+
+export function renderCursorMcp(root) {
+  const profile = { pluginRoot: '{{PLUGIN_ROOT}}/', mcpEnvSpelling: '${env:NAME}', mcpStyle: { inlinePrimitiveArrays: true } };
+  return renderMcpJson(root, profile);
+}
+
 export function renderManifest(root, rel, version, style = { inlinePrimitiveArrays: true }) {
   const manifest = readJson(root, rel);
   if ('version' in manifest) manifest.version = version;

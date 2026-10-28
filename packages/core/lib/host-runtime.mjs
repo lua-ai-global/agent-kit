@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { isHeadless } from './headless.mjs';
 import { normaliseInput, render, resolveHost } from './host.mjs';
-import { DEFAULT_HOST } from './host-default.mjs';
+import { DEFAULT_HOST, FAIL_CLOSED_HOOKS } from './host-default.mjs';
 
 const REQUIRED_NODE_MAJOR = 18;
 
@@ -80,6 +80,15 @@ export async function runHook(hookName, decideFn, { eventName } = {}) {
     write(output);
     exit(output.code);
   } catch (err) {
+    if (FAIL_CLOSED_HOOKS.includes(hookName)) {
+      const output = render(resolveHost(process.env, null, DEFAULT_HOST), {
+        block: true,
+        reason: `Hook ${hookName} error: ${err.message}. Blocking the command, because this hook is the deploy gate (fail-closed).`,
+      }, { hookName });
+      write(output);
+      exit(output.code);
+      return;
+    }
     log.toClaudeCode(`Hook ${hookName} error: ${err.message}. Allowing the tool call (fail-open).`);
     exit(0);
   }

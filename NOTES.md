@@ -62,6 +62,19 @@ Filed, not fixed (fixing them changes shipped bytes, so they wait for a release)
 - Known overlap: Codex reads `~/.agents/skills`, so a Codex user with the plugin also sees the universal skills. They are print-only, so the overlap is safe but duplicated.
 - Not done: detecting network or FAT mounts for the copy fallback; Windows was not run (the copy path is exercised with `LUA_AGENT_KIT_NO_SYMLINKS=1`).
 
+## Cursor
+
+- `dist/cursor` is the hook bundle: the six shell hooks from core (`beforeShellExecution`), the multi-host runtime with `DEFAULT_HOST = 'cursor'`, the MCP bundle, and `cursor-hooks.json` / `cursor-mcp.json` templates. The installer renders them with the real hub path into `~/.cursor/hooks.json` and `~/.cursor/mcp.json` (or `.cursor/` with `--project`) only when those files do not exist; an existing file is never edited, the rendered one is left next to the hub for the user to merge, and doctor reports Cursor as Tier C until it is.
+- `failClosed: true` is set on `before-shell-execution` and `confirm-deploy`, and the runtime blocks instead of failing open when one of those two hooks throws on Cursor (`FAIL_CLOSED_HOOKS` in `lib/host-default.mjs`). Every other hook, and every hook on Claude Code and Codex, still fails open.
+- Not registered on Cursor: the SessionStart hooks (version, project detection, auth), `inject-context` and the two PostToolUse hooks. Their input and output contracts on Cursor were not verified.
+- Open question: a hook `warn` renders `{permission: "allow", user_message}` on Cursor, inherited from the parity runtime and pinned by its test. If Cursor treats `allow` as auto-approval, `warn-version-zero` skips Cursor's own prompt; then `warn` should omit `permission`.
+- Cursor reads its skills from `~/.cursor/skills`; they are the universal Tier C skills, so their notice ("no hook can stop a command") is conservative once the Cursor hooks are armed.
+- Not run in a real Cursor session: no `cursor-agent` binary on this machine. The hooks were run as processes with Cursor's payload and environment (`test/cursor-dist.test.mjs`).
+
+## Cross-adapter lint
+
+`build/parity.mjs` implements clauses 1 (one tokenizer, byte-identical in every tree), 5 (no foreign host token in shipped files) and 6 (no dropped skill or rule) of the scope's seven. Clauses 2 (one rules digest), 3 (every gated verb enforced or waived per host), 4 (no bare production verb or `--auto-deploy` in any output) and 7 (permissions-mirror against every adapter) are not built yet; the Claude and Codex trees each still run their own `permissions-mirror` test.
+
 ## Deferred
 
 - The 6 KB permission `_comment` is still one string per host (`src/permissions/comment.<host>.json`), kept verbatim so the Claude template stays byte-identical. Splitting it into per-row rationale changes the emitted template.

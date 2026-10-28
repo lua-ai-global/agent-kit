@@ -6,6 +6,7 @@ import { currentVersion, hubVersions } from '../hub.mjs';
 import { makeContext, readState } from '../context.mjs';
 import { exists, pathKind } from '../fsops.mjs';
 import { existingMarketplace, nativeFor, ownsMarketplace } from '../native.mjs';
+import { CURSOR_NEXT, fileDigest } from '../cursor-files.mjs';
 
 const GATE_HOOKS = {
   'claude-code': { path: 'plugins/lua-agent-builder/hooks/confirm-deploy.mjs', env: { CLAUDE_PLUGIN_ROOT: '1' } },
@@ -43,14 +44,26 @@ function nativeStatus(agent, entry, ctx) {
   return { registered, marketplace: native.marketplace, source: entry.source, loadedFrom, gate: gateSelfTest(agent, loadedFrom, ctx), next: native.next };
 }
 
+function cursorStatus(entry, ctx) {
+  const registered = fileDigest(entry.path) === entry.digest;
+  return { registered, marketplace: entry.path, source: entry.source, loadedFrom: entry.source, gate: gateSelfTest('cursor', entry.source, ctx), next: CURSOR_NEXT };
+}
+
+function pluginStatus(host, entries, ctx) {
+  const native = entries.find((e) => e.kind === 'native');
+  if (native) return nativeStatus(host.id, native, ctx);
+  const hooks = entries.find((e) => e.kind === 'file' && e.role === 'hooks');
+  return hooks ? cursorStatus(hooks, ctx) : null;
+}
+
 function hostReport(host, ctx, state, detected) {
   const entries = state.entries.filter((e) => e.agent === host.id);
-  const native = entries.find((e) => e.kind === 'native');
-  const tier = native ? host.tier : 'C';
+  const plugin = pluginStatus(host, entries, ctx);
+  const tier = plugin?.registered ? host.tier : 'C';
   return {
     id: host.id, name: host.name, adapter: hasAdapter(host), detected: detected[host.id], installed: entries.length > 0, tier, tierText: TIER_TEXT[tier],
     links: entries.filter((e) => e.kind === 'link').length, copies: entries.filter((e) => e.kind === 'copy').length,
-    plugin: native ? nativeStatus(host.id, native, ctx) : null,
+    plugin,
   };
 }
 
@@ -72,9 +85,10 @@ function seenText(detected) {
 }
 
 function printPlugin(h, io) {
-  io.out(`  plugin: marketplace "${h.plugin.marketplace}" ${h.plugin.registered ? 'registered from the hub' : 'NOT registered from the hub'}`);
+  const what = h.id === 'cursor' ? `hooks file ${h.plugin.marketplace}` : `marketplace "${h.plugin.marketplace}"`;
+  io.out(`  plugin: ${what} ${h.plugin.registered ? 'registered from the hub' : 'NOT registered from the hub'}`);
   io.out(`  gate self-test on ${h.plugin.loadedFrom}: ${h.plugin.gate.ok ? 'ok' : 'FAILED'}, ${h.plugin.gate.detail}`);
-  if (h.id === 'codex') io.out(`  ${h.plugin.next}`);
+  if (h.id !== 'claude-code') io.out(`  ${h.plugin.next}`);
 }
 
 function printHost(h, io) {

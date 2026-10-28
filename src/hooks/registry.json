@@ -35,6 +35,14 @@
         "block-device-secret", "warn-version-zero"
       ],
       "PostToolUse": ["post-deploy-smoke", "post-compile-summary"]
+    },
+    "cursor": {
+      "beforeShellExecution": [
+        "before-shell-execution", "confirm-deploy", "block-auto-deploy", "block-device-secret", "approve-web-app", "warn-version-zero"
+      ]
     }
+  },
+  "failClosed": {
+    "cursor": ["before-shell-execution", "confirm-deploy"]
   }
 }

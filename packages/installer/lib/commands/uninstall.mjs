@@ -1,5 +1,6 @@
 import { readdirSync, rmdirSync } from 'node:fs';
 import { removeHub } from '../hub.mjs';
+import { fileDigest } from '../cursor-files.mjs';
 import { makeContext, readState, writeState } from '../context.mjs';
 import { digestTree, isInside, linkTarget, pathKind, remove } from '../fsops.mjs';
 import { nativeFor } from '../native.mjs';
@@ -35,7 +36,15 @@ function removeNative(entry, ctx) {
   return { keep: !result.ok, lines: result.lines };
 }
 
-const REMOVERS = { link: removeLink, copy: removeCopy, native: removeNative };
+function removeFile(entry) {
+  const digest = fileDigest(entry.path);
+  if (digest === null) return { keep: false, line: `gone already: ${entry.path}` };
+  if (digest !== entry.digest) return { keep: true, line: `edited since install, left untouched: ${entry.path}` };
+  remove(entry.path);
+  return { keep: false, line: `removed ${entry.path}` };
+}
+
+const REMOVERS = { link: removeLink, copy: removeCopy, native: removeNative, file: removeFile };
 
 export async function uninstall(opts, io) {
   const ctx = makeContext(opts, io.env);

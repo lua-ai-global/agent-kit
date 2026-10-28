@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      { "command": "node \"{{PLUGIN_ROOT}}/hooks/before-shell-execution.mjs\"", "timeout": 30, "failClosed": true },
+      { "command": "node \"{{PLUGIN_ROOT}}/hooks/confirm-deploy.mjs\"", "timeout": 10, "failClosed": true },
+      { "command": "node \"{{PLUGIN_ROOT}}/hooks/block-auto-deploy.mjs\"", "timeout": 10 },
+      { "command": "node \"{{PLUGIN_ROOT}}/hooks/block-device-secret.mjs\"", "timeout": 10 },
+      { "command": "node \"{{PLUGIN_ROOT}}/hooks/approve-web-app.mjs\"", "timeout": 10 },
+      { "command": "node \"{{PLUGIN_ROOT}}/hooks/warn-version-zero.mjs\"", "timeout": 10 }
+    ]
+  }
+}

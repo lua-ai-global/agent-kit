@@ -1,0 +1,17 @@
+{
+  "rules": [],
+  "files": {
+    "lib/headless.mjs": [
+      {
+        "from": "// plugin runs inside a non-interactive Codex invocation (or any other",
+        "to": "// plugin runs inside a non-interactive Cursor agent run (or any other"
+      }
+    ],
+    "hooks/before-shell-execution.mjs": [
+      {
+        "from": "'Do not enter your email, OTP, or credential in the Codex conversation.',",
+        "to": "'Do not enter your email, OTP, or credential in the Cursor conversation.',"
+      }
+    ]
+  }
+}

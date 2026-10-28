@@ -58,6 +58,11 @@ check "user-authored ~/.claude/skills/lua-deploy is untouched" '[ "$(cat "$HOME/
 agentkit install --project --agent claude-code --skills-only --yes >"$work/project.log" 2>&1
 check "project scope writes copies" '[ -d .claude/skills/lua-auth ] && [ ! -L .claude/skills/lua-auth ]'
 
+agentkit install --agent cursor --yes >"$work/cursor.log" 2>&1
+agentkit doctor >"$work/doctor-cursor.log" 2>&1
+check "cursor: hooks.json written with failClosed on the gate" 'grep -q "confirm-deploy.mjs.*failClosed\": true" "$HOME/.cursor/hooks.json"'
+check "doctor: Cursor Tier B with a passing gate self-test" 'grep -q "Cursor: .*installed, Tier B" "$work/doctor-cursor.log" && grep -A3 "^Cursor:" "$work/doctor-cursor.log" | grep -q "gate self-test on .*: ok"'
+
 mkdir -p "$kit/data" && echo keep > "$kit/data/keep.txt"
 agentkit uninstall >"$work/uninstall.log" 2>&1
 check "uninstall: scratch project git status clean" '[ -z "$(git status --porcelain)" ]'
@@ -65,6 +70,7 @@ check "uninstall: only data/ left in the hub" '[ "$(cd "$kit" && find . -mindept
 check "uninstall: no universal links left" '[ ! -e "$HOME/.agents" ]'
 check "uninstall: claude plugin and marketplace gone" '! claude plugin list --json | grep -q lua-agent-builder && ! claude plugin marketplace list --json | grep -q claude-code-lua-plugin'
 check "uninstall: codex plugin and marketplace gone" '! codex plugin marketplace list --json | grep -q lua-ai-marketplace'
+check "uninstall: cursor hooks.json and mcp.json removed" '[ ! -e "$HOME/.cursor/hooks.json" ] && [ ! -e "$HOME/.cursor/mcp.json" ]'
 check "uninstall: user-authored skill still there" '[ "$(cat "$HOME/.claude/skills/lua-deploy/SKILL.md")" = mine ]'
 
 LUA_AGENT_KIT_NO_SYMLINKS=1 agentkit install --agent gemini --yes >"$work/copy.log" 2>&1

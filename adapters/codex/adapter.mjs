@@ -1,7 +1,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { renderHooksJson, renderManifest, renderMcpJson, renderPermissionsTemplate } from '../../build/generators.mjs';
+import { hostDefault, renderHooksJson, renderManifest, renderMcpJson, renderPermissionsTemplate } from '../../build/generators.mjs';
 import { applyPairs, applyRules, loadGlossary, unusedGlossaryPaths } from '../../build/glossary.mjs';
 import { kitReader } from '../../build/readers.mjs';
 import { agentToToml, knowledgeToMdc } from '../../build/transforms.mjs';
@@ -70,7 +70,7 @@ export function generate({ root, version }) {
   return [
     ...out,
     { path: 'lib/hook-runtime.mjs', content: readFileSync(join(root, 'packages', 'core', 'lib', 'host-runtime.mjs'), 'utf8') },
-    { path: 'lib/host-default.mjs', content: `export const DEFAULT_HOST = '${profile.defaultHost}';\n` },
+    { path: 'lib/host-default.mjs', content: hostDefault(root, profile.defaultHost) },
     { path: 'lib/permissions-template.json', content: renderPermissionsTemplate(root, 'codex') },
     { path: 'hooks/hooks.json', content: renderHooksJson(root, profile) },
     { path: '.mcp.json', content: renderMcpJson(root, profile) },

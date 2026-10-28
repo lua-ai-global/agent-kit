@@ -11,23 +11,36 @@ function wantsNative(host, selection, payloadTrees) {
   return hasAdapter(host) && !selection.skillsOnly && Boolean(nativeFor(host.id)) && payloadTrees.includes(host.adapter);
 }
 
+function wantsCursorFiles(host, selection, payloadTrees) {
+  return host.id === 'cursor' && !selection.skillsOnly && payloadTrees.includes('cursor');
+}
+
+function adapterNote(host, selection, filesHost) {
+  if (!hasAdapter(host) || selection.skillsOnly || filesHost) return null;
+  return `${host.name}: no plugin in this payload yet, installing skills only (Tier C).`;
+}
+
 export function destinations(selection, ctx, payloadTrees) {
   const base = baseDir(ctx);
   const dirs = new Map([[join(base, UNIVERSAL[ctx.scope]), { agent: 'universal', dir: join(base, UNIVERSAL[ctx.scope]) }]]);
   const natives = [];
   const notes = [];
+  let cursorFiles = false;
   for (const id of selection.agents) {
     const host = hostById(id);
     if (wantsNative(host, selection, payloadTrees)) {
       natives.push({ agent: id, native: nativeFor(id) });
       continue;
     }
-    if (hasAdapter(host) && !selection.skillsOnly) notes.push(`${host.name}: no plugin in this payload yet, installing skills only (Tier C).`);
+    const filesHost = wantsCursorFiles(host, selection, payloadTrees);
+    cursorFiles ||= filesHost;
+    const note = adapterNote(host, selection, filesHost);
+    if (note) notes.push(note);
     if (readsUniversal(host, ctx.scope)) continue;
     const dir = join(base, host.skills[ctx.scope]);
     if (!dirs.has(dir)) dirs.set(dir, { agent: id, dir });
   }
-  return { dirs: [...dirs.values()], natives, notes };
+  return { dirs: [...dirs.values()], natives, notes, cursorFiles };
 }
 
 function recorded(state, path) {

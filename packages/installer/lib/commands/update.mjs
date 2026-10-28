@@ -1,4 +1,5 @@
-import { basename, dirname } from 'node:path';
+import { basename, dirname, join } from 'node:path';
+import { applyCursorFile, planCursorFiles } from '../cursor-files.mjs';
 import { currentVersion, hubVersions, materialise, prune, setCurrent } from '../hub.mjs';
 import { attachPayload, makeContext, readState, writeState } from '../context.mjs';
 import { nativeFor } from '../native.mjs';
@@ -34,7 +35,20 @@ function switchVersion(ctx, payload, target) {
   return previous;
 }
 
+function rewriteCursorFiles(state, ctx, filter, io) {
+  const recorded = state.entries.filter((e) => e.kind === 'file' && filter(e));
+  for (const entry of recorded) {
+    const scoped = { ...ctx, scope: entry.install.startsWith('project:') ? 'project' : 'user', cwd: entry.install.replace(/^project:/, '') };
+    const plan = planCursorFiles(scoped, state, ctx.targetVersion).find((p) => p.path === entry.path);
+    if (!plan) continue;
+    const { entry: next, line } = applyCursorFile(plan, entry.install, join(ctx.hub.version(ctx.targetVersion), 'cursor'));
+    io.out(`  ${line}`);
+    if (next) Object.assign(entry, next);
+  }
+}
+
 function repointNatives(state, ctx, filter, io) {
+  rewriteCursorFiles(state, ctx, filter, io);
   for (const entry of state.entries.filter((e) => e.kind === 'native' && filter(e))) {
     const plan = planNative({ agent: entry.agent, native: nativeFor(entry.agent) }, ctx, state, ctx.targetVersion);
     const { entry: next, lines } = applyNative(plan, ctx, entry.install);

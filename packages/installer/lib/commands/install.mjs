@@ -1,4 +1,5 @@
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
+import { CURSOR_NEXT, applyCursorFile, planCursorFiles } from '../cursor-files.mjs';
 import { HOSTS, detectAll } from '../hosts.mjs';
 import { materialise, prune, setCurrent } from '../hub.mjs';
 import { attachPayload, makeContext, readState, scopeKey, writeState } from '../context.mjs';
@@ -44,8 +45,17 @@ function printPlan(plan, io) {
   if (plan.ctx.scope === 'project') {
     io.out('Project scope: these files are copies inside the repository. They are committable and will reach your teammates; project hooks need workspace trust.');
   }
-  for (const a of plan.skills) io.out(`  ${OP_TEXT[a.op].padEnd(15)} ${a.path}${a.reason ? `: ${a.reason}` : ''}`);
-  for (const n of plan.natives) io.out(`  ${(n.op === 'match' ? 'already matches' : n.op).padEnd(15)} ${n.agent} plugin from ${n.source}${n.reason ? `: ${n.reason}` : ''}`);
+  printActions(plan, io);
+}
+
+function actionLine(op, what, reason) {
+  return `  ${(OP_TEXT[op] ?? op).padEnd(15)} ${what}${reason ? `: ${reason}` : ''}`;
+}
+
+function printActions(plan, io) {
+  for (const a of plan.skills) io.out(actionLine(a.op, a.path, a.reason));
+  for (const n of plan.natives) io.out(actionLine(n.op, `${n.agent} plugin from ${n.source}`, n.reason));
+  for (const f of plan.files) io.out(actionLine(f.op, f.path, f.reason));
 }
 
 function missingDirs(dirs, base) {
@@ -70,7 +80,20 @@ export function buildPlan(selection, ctx) {
   const dests = destinations(selection, ctx, ctx.payload.manifest.trees);
   const skills = planSkills(dests.dirs, skillNames(ctx.payload.dir), ctx, state);
   const natives = dests.natives.map((item) => planNative(item, ctx, state));
-  return { selection, ctx, state, skills, natives, notes: dests.notes, createdDirs: missingDirs(dests.dirs, baseDir(ctx)) };
+  const files = dests.cursorFiles ? planCursorFiles(ctx, state) : [];
+  const created = missingDirs([...dests.dirs, ...files.map((f) => ({ dir: dirname(f.path) }))], baseDir(ctx));
+  return { selection, ctx, state, skills, natives, files, notes: dests.notes, createdDirs: created };
+}
+
+function applyFiles(plan, ctx, key, io) {
+  const entries = [];
+  for (const f of plan.files) {
+    const { entry, line } = applyCursorFile(f, key, join(ctx.hub.version(ctx.payload.version), 'cursor'));
+    io.out(`  ${line}`);
+    if (entry) entries.push(entry);
+  }
+  if (entries.some((e) => e.role === 'hooks')) io.out(`  cursor: ${CURSOR_NEXT}`);
+  return entries;
 }
 
 export function applyPlan(plan, io) {
@@ -85,6 +108,7 @@ export function applyPlan(plan, io) {
     for (const line of lines) io.out(`  ${line}`);
     if (entry) entries.push(entry);
   }
+  entries.push(...applyFiles(plan, ctx, key, io));
   const agents = [...new Set([...(state.installs[key]?.agents ?? []), ...plan.selection.agents])];
   const installs = {
     ...state.installs,
@@ -107,7 +131,8 @@ export async function install(opts, io) {
     return 0;
   }
   const { entries } = applyPlan(plan, io);
-  const skipped = plan.skills.filter((a) => a.op === 'skip').length + plan.natives.filter((n) => n.op === 'skip' || n.op === 'error').length;
+  const skipped = [...plan.skills, ...plan.files].filter((a) => a.op === 'skip').length
+    + plan.natives.filter((n) => n.op === 'skip' || n.op === 'error').length;
   const failed = entries.filter((e) => e.status === 'failed').length;
   io.out(`Done: ${entries.length} recorded in ${ctx.hub.state}${skipped ? `, ${skipped} left untouched` : ''}${failed ? `, ${failed} failed` : ''}.`);
   return failed ? 1 : 0;
