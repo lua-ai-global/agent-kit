@@ -38,7 +38,7 @@ describe('parity over the committed dist', () => {
 describe('parity catches drift', () => {
   test('clause 2: a permission row dropped from one host', async () => {
     const dist = copyDist('c2');
-    edit(join(dist, 'codex', 'lib', 'permissions-template.json'), '"Bash(lua sync --accept*)",', '');
+    edit(join(dist, 'codex', 'lib', 'permissions-template.json'), '"Bash(lua sync --check*)",', '');
     const { problems } = await runParity(dist);
     assert.ok(problems.some((p) => p.startsWith('clause 2: codex')), problems.join('\n'));
   });

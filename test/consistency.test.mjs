@@ -45,11 +45,15 @@ describe('one permission rule set', () => {
     }
   });
 
-  test('lua sync --accept sits in the same tier as its --pull twin on every host', () => {
-    for (const path of ['dist/claude-code/plugins/lua-agent-builder/lib/permissions-template.json', 'dist/codex/lib/permissions-template.json']) {
-      const { permissions } = JSON.parse(read(path));
-      assert.ok(permissions.allow.includes('Bash(lua sync --pull*)') && permissions.allow.includes('Bash(lua sync --accept*)'), path);
-      assert.ok(permissions.ask.includes('Bash(lua sync --pull --force*)') && permissions.ask.includes('Bash(lua sync --accept --force*)'), path);
+  test('lua sync --accept has no row on any host, so it falls to the host prompt, and --pull keeps its tiers', () => {
+    const templates = ['dist/claude-code/plugins/lua-agent-builder/lib/permissions-template.json', 'dist/codex/lib/permissions-template.json'];
+    const rowSets = templates.map((path) => JSON.parse(read(path)).permissions);
+    for (const [i, permissions] of rowSets.entries()) {
+      const all = Object.values(permissions).flat();
+      assert.equal(all.some((r) => r.includes('--accept')), false, templates[i]);
+      assert.ok(permissions.allow.includes('Bash(lua sync --pull*)') && permissions.ask.includes('Bash(lua sync --pull --force*)'), templates[i]);
     }
+    const shared = (p) => Object.fromEntries(Object.entries(p).map(([tier, rows]) => [tier, rows.filter((r) => !r.includes('lib/qa/cli.mjs'))]));
+    assert.deepEqual(shared(rowSets[0]), shared(rowSets[1]));
   });
 });
