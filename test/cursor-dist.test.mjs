@@ -42,9 +42,11 @@ describe('Cursor gate in the emitted tree', () => {
   });
 
   test('credential printers are denied under every binary name', () => {
-    for (const bin of ['lua', 'heylua', 'lua-ai']) {
-      const r = runHook('before-shell-execution', shell(`${bin} auth key`));
-      assert.equal(r.out.permission, 'deny', bin);
+    for (const bin of ['lua', 'heylua', 'lua-ai', 'npx lua-cli']) {
+      for (const verb of ['auth key', 'auth configure', 'auth logout']) {
+        const r = runHook('before-shell-execution', shell(`${bin} ${verb}`));
+        assert.equal(r.out.permission, 'deny', `${bin} ${verb}`);
+      }
     }
   });
 

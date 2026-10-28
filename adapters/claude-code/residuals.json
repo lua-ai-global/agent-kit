@@ -8,6 +8,9 @@
     "plugins/lua-agent-builder/lib/host.mjs": { "kind": "extra", "category": "kit-fix", "reason": "resolveHost() and the per-host protocols the shared runtime renders through" },
     "plugins/lua-agent-builder/lib/host-default.mjs": { "kind": "extra", "category": "kit-fix", "reason": "the emitted default host (claude-code) and its empty fail-closed list" },
     "plugins/lua-agent-builder/test/lib/host.test.mjs": { "kind": "extra", "category": "kit-fix", "reason": "unit tests for lib/host.mjs" },
+    "plugins/lua-agent-builder/hooks/block-auth-configure.mjs": { "kind": "content", "category": "kit-fix", "reason": "matches lua, heylua, lua-ai and lua-cli, through launchers, paths and shell strings; `\\blua\\s+` missed `heylua auth configure` and `lua-ai auth configure`" },
+    "plugins/lua-agent-builder/lib/lua-bin.mjs": { "kind": "extra", "category": "kit-fix", "reason": "the one pattern for a lua-cli invocation under any of its names, shared by the credential hooks" },
+    "plugins/lua-agent-builder/test/hooks/block-auth-configure.aliases.test.mjs": { "kind": "extra", "category": "kit-fix", "reason": "every alias, launcher and path form is blocked; the alias list is checked against the deploy classifier" },
     "plugins/lua-agent-builder/test/lib/hook-runtime-symlink.test.mjs": { "kind": "extra", "category": "kit-fix", "reason": "runs the gate through a symlinked plugin path and proves it fires" }
   }
 }

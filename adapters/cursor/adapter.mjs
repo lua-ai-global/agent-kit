@@ -18,6 +18,7 @@ export const mounts = [
   { from: 'packages/core/lib/credentials.mjs', to: 'lib/credentials.mjs' },
   { from: 'packages/core/lib/host.mjs', to: 'lib/host.mjs' },
   { from: 'packages/core/lib/hook-runtime.mjs', to: 'lib/hook-runtime.mjs' },
+  { from: 'packages/core/lib/lua-bin.mjs', to: 'lib/lua-bin.mjs' },
   { from: 'packages/mcp-lua-platform/dist', to: 'mcp/lua-platform/dist' },
   { from: 'packages/mcp-lua-platform/package.json', to: 'mcp/lua-platform/package.json' },
 ];

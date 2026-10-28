@@ -24,11 +24,7 @@
 // invoked" that each rule reuses.
 
 import { runHook, checkNodeVersion, isMainScript } from '../lib/hook-runtime.mjs';
-
-// Start of a command word, an optional path prefix (`./node_modules/.bin/lua`,
-// `/usr/local/bin/heylua`), then one of the three binary names.
-const LUA_BIN = String.raw`(?:^|[\s;&|(])(?:[^\s;&|()]*[/\\])?(?:lua|heylua|lua-ai)\s+`;
-const luaCommand = (...verb) => new RegExp(LUA_BIN + verb.join(String.raw`\s+`) + String.raw`\b`);
+import { luaCommand } from '../lib/lua-bin.mjs';
 
 const AUTH_KEY = luaCommand('auth', 'key');
 const AUTH_CONFIGURE = luaCommand('auth', 'configure');

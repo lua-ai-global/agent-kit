@@ -56,10 +56,12 @@ describe.each(Object.keys(ENV_BY_HOST))('shipped hook processes under %s', (host
     expect(r.stdout).toBe('');
   });
 
-  test('block-auth-configure blocks the credential prompt', () => {
-    const r = run(host, 'block-auth-configure', 'lua auth configure');
-    if (host === 'cursor') expect(JSON.parse(r.stdout).permission).toBe('deny');
-    else expect(r.code).toBe(2);
+  test('block-auth-configure blocks the credential prompt under every binary name', () => {
+    for (const bin of ['lua', 'heylua', 'lua-ai', 'npx lua-cli']) {
+      const r = run(host, 'block-auth-configure', `${bin} auth configure`);
+      if (host === 'cursor') expect(JSON.parse(r.stdout).permission).toBe('deny');
+      else expect(r.code).toBe(2);
+    }
   });
 
   test('approve-web-app pre-approves the one exact command in the host format', () => {

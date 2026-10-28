@@ -1,8 +1,11 @@
 import { runHook, checkNodeVersion, isMainScript } from '../lib/hook-runtime.mjs';
+import { luaCommand } from '../lib/lua-bin.mjs';
+
+const AUTH_CONFIGURE = luaCommand('auth', 'configure');
 
 export function decide(input) {
   const command = input?.tool_input?.command ?? '';
-  if (!/\blua\s+auth\s+configure\b/.test(command)) return null;
+  if (!AUTH_CONFIGURE.test(command)) return null;
 
   return {
     block: true,

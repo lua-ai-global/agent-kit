@@ -6,7 +6,9 @@
     "host-runtime": "Scope step 4: lib/hook-runtime.mjs becomes the multi-host runtime over lib/host.mjs (resolveHost() and the three protocol emitters), replacing the isCursorRuntime branch.",
     "tokenizer-verbatim": "Parity clause 1: every adapter's tokenizer is byte-identical to core's. The Codex copy differed only in three comment sentences that name Claude Code.",
     "stale-dropped": "Unreferenced v1.0.0 leftovers superseded by rules/*.mdc.",
-    "parity-bug-fixed": "A bug in the parity tree that the generator does not reproduce. Listed in NOTES.md."
+    "parity-bug-fixed": "A bug in the parity tree that the generator does not reproduce. Listed in NOTES.md.",
+    "kit-fix": "A bug fixed in the kit's canonical source after the parity branch; the live plugins are sunset and never patched.",
+    "kit-consistency": "One canonical value or rule for every host, decided in the kit (see NOTES.md)."
   },
   "residuals": {
     "skills/lua-audit/SKILL.md": { "kind": "extra", "category": "claude-1.16", "reason": "/lua-audit is new in 1.16.0" },
@@ -55,6 +57,8 @@
     "lib/host.mjs": { "kind": "extra", "category": "host-runtime", "reason": "resolveHost() and the claude-code, codex and cursor protocols" },
     "lib/host-default.mjs": { "kind": "extra", "category": "host-runtime", "reason": "the emitted default host (codex) when no host signal is present" },
     "test/lib/host.test.mjs": { "kind": "extra", "category": "host-runtime", "reason": "unit tests for lib/host.mjs" },
+    "hooks/before-shell-execution.mjs": { "kind": "content", "category": "kit-fix", "reason": "uses the shared lib/lua-bin.mjs pattern, which adds lua-cli, launcher extensions, quoted shell strings and case-insensitive matching" },
+    "lib/lua-bin.mjs": { "kind": "extra", "category": "kit-fix", "reason": "the one pattern for a lua-cli invocation under any of its names" },
     "test/lib/hook-runtime-symlink.test.mjs": { "kind": "extra", "category": "host-runtime", "reason": "runs the gate through a symlinked plugin path and proves it fires" },
 
     "lib/tokenizer.mjs": { "kind": "content", "category": "tokenizer-verbatim", "reason": "three comment sentences; code identical" },
