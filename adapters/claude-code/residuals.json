@@ -1,0 +1,7 @@
+{
+  "categories": {
+    "kit-fix": "A bug fixed in the kit. The live claude-code-lua-plugin is being sunset and is never patched, so the fix shows up here as a declared difference from the 1.16.0 baseline.",
+    "kit-consistency": "One canonical value or rule for every host, decided in the kit (see NOTES.md)."
+  },
+  "residuals": {}
+}
