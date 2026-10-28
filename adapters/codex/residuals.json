@@ -1,0 +1,70 @@
+{
+  "categories": {
+    "claude-1.16": "Content Claude added in 1.16.0 (/lua-audit). The parity branch was cut against Claude 1.15.0, so the kit's one canonical source is ahead of it.",
+    "canonical-newer": "The kit ships one copy of shared code. The Codex tree carried an older copy; the kit emits the canonical (newer) one, as the scope decides for credentials.mjs and the MCP server.",
+    "tests-superset": "The kit runs the canonical (Claude) test suites on every host. The Codex copies were older subsets of them; the generated tree passes the full suites.",
+    "host-runtime": "Scope step 4: lib/hook-runtime.mjs becomes the multi-host runtime over lib/host.mjs (resolveHost() and the three protocol emitters), replacing the isCursorRuntime branch.",
+    "tokenizer-verbatim": "Parity clause 1: every adapter's tokenizer is byte-identical to core's. The Codex copy differed only in three comment sentences that name Claude Code.",
+    "stale-dropped": "Unreferenced v1.0.0 leftovers superseded by rules/*.mdc.",
+    "parity-bug-fixed": "A bug in the parity tree that the generator does not reproduce. Listed in NOTES.md."
+  },
+  "residuals": {
+    "skills/lua-audit/SKILL.md": { "kind": "extra", "category": "claude-1.16", "reason": "/lua-audit is new in 1.16.0" },
+    "agents/lua-auditor.toml": { "kind": "extra", "category": "claude-1.16", "reason": "the read-only lua-auditor agent is new in 1.16.0" },
+    "hooks/inject-context.mjs": { "kind": "content", "category": "claude-1.16", "reason": "1.16.0 adds the web-app audit hint" },
+    "test/hooks/inject-context.test.mjs": { "kind": "content", "category": "claude-1.16", "reason": "tests for the 1.16.0 web-app audit hint" },
+    "rules/web-apps.mdc": { "kind": "content", "category": "claude-1.16", "reason": "1.16.0 adds the access-rule guidance and the /lua-audit row" },
+    "skills/lua-new/SKILL.md": { "kind": "content", "category": "claude-1.16", "reason": "1.16.0 adds the webapp audit offer (Step 4)" },
+
+    "lib/credentials.mjs": { "kind": "content", "category": "canonical-newer", "reason": "the 4-tier resolver with the lua-cli session tier; the Codex copy was the old 3-tier one" },
+    "test/lib/credentials.test.mjs": { "kind": "content", "category": "canonical-newer", "reason": "tests for the 4-tier resolver" },
+    "mcp/lua-platform/.gitignore": { "kind": "content", "category": "canonical-newer", "reason": "dist/ is committed; the Codex copy ignored it, so a marketplace install had no dist/server.js to launch" },
+    "mcp/lua-platform/README.md": { "kind": "content", "category": "canonical-newer", "reason": "README of the canonical MCP server" },
+    "mcp/lua-platform/package-lock.json": { "kind": "content", "category": "canonical-newer", "reason": "lockfile of the canonical MCP server (version stamp plus dependency drift)" },
+    "mcp/lua-platform/package.json": { "kind": "content", "category": "canonical-newer", "reason": "canonical scripts (lint, typecheck) besides the version stamp" },
+    "mcp/lua-platform/scripts/bundle.mjs": { "kind": "content", "category": "canonical-newer", "reason": "the canonical bundler" },
+    "mcp/lua-platform/tsconfig.json": { "kind": "content", "category": "canonical-newer", "reason": "the canonical checkJs config" },
+    "mcp/lua-platform/src/api-client.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical client; X-Lua-Client stays codex-plugin/<version> through the glossary" },
+    "mcp/lua-platform/src/auth.mjs": { "kind": "content", "category": "canonical-newer", "reason": "adds the lua-cli session tier; the Codex copy failed for every session login (the default since lua-cli 3.29)" },
+    "mcp/lua-platform/src/response-shapes.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical response shapes" },
+    "mcp/lua-platform/src/server.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical server (a JSDoc cast) besides the version stamp" },
+    "mcp/lua-platform/src/tools/get-agent.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical tool" },
+    "mcp/lua-platform/src/tools/get-deployment-status.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical tool" },
+    "mcp/lua-platform/src/tools/list-agents.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical tool" },
+    "mcp/lua-platform/src/tools/list-primitive-versions.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical tool" },
+    "mcp/lua-platform/src/tools/tail-logs.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical tool" },
+    "mcp/lua-platform/src/run-lua.mjs": { "kind": "extra", "category": "canonical-newer", "reason": "module of the canonical server" },
+    "mcp/lua-platform/dist/server.js": { "kind": "extra", "category": "canonical-newer", "reason": "the committed bundle .mcp.json launches" },
+    "mcp/lua-platform/dist/THIRD_PARTY_NOTICES.txt": { "kind": "extra", "category": "canonical-newer", "reason": "licence notices of the committed bundle" },
+    "mcp/lua-platform/tests/api-client.test.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical tests (header asserted as codex-plugin through the glossary)" },
+    "mcp/lua-platform/tests/auth.test.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical tests" },
+    "mcp/lua-platform/tests/response-shapes.test.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical tests" },
+    "mcp/lua-platform/tests/standalone-bundle.test.mjs": { "kind": "extra", "category": "canonical-newer", "reason": "proves the committed bundle runs alone" },
+    "mcp/lua-platform/tests/tools/get-agent.test.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical tests" },
+    "mcp/lua-platform/tests/tools/get-deployment-status.test.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical tests" },
+    "mcp/lua-platform/tests/tools/list-agents.test.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical tests" },
+    "mcp/lua-platform/tests/tools/list-primitive-versions.test.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical tests" },
+    "mcp/lua-platform/tests/tools/tail-logs.test.mjs": { "kind": "content", "category": "canonical-newer", "reason": "canonical tests" },
+
+    "test/hooks/confirm-deploy.test.mjs": { "kind": "content", "category": "tests-superset", "reason": "the canonical suite covers every gated verb, not only lua deploy" },
+    "test/hooks/confirm-deploy.integration.test.mjs": { "kind": "content", "category": "tests-superset", "reason": "canonical integration suite" },
+    "test/lib/tokenizer.test.mjs": { "kind": "content", "category": "tests-superset", "reason": "canonical suite includes classifyProductionCommand" },
+    "test/lib/lua-cli-spawn.test.mjs": { "kind": "content", "category": "tests-superset", "reason": "canonical suite (comment and variable-name drift only)" },
+
+    "lib/hook-runtime.mjs": { "kind": "content", "category": "host-runtime", "reason": "multi-host runtime; the parity runtime's own test (test/lib/hook-runtime.test.mjs) passes unchanged against it" },
+    "lib/host.mjs": { "kind": "extra", "category": "host-runtime", "reason": "resolveHost() and the claude-code, codex and cursor protocols" },
+    "lib/host-default.mjs": { "kind": "extra", "category": "host-runtime", "reason": "the emitted default host (codex) when no host signal is present" },
+    "test/lib/host.test.mjs": { "kind": "extra", "category": "host-runtime", "reason": "unit tests for lib/host.mjs" },
+
+    "lib/tokenizer.mjs": { "kind": "content", "category": "tokenizer-verbatim", "reason": "three comment sentences; code identical" },
+
+    "lib/knowledge/decision-trees.md": { "kind": "missing", "category": "stale-dropped", "reason": "v1.0.0 copy, superseded by rules/decision-trees.mdc" },
+    "lib/knowledge/integrations.md": { "kind": "missing", "category": "stale-dropped", "reason": "v1.0.0 copy, superseded by rules/integrations.mdc" },
+    "lib/knowledge/primitives.md": { "kind": "missing", "category": "stale-dropped", "reason": "v1.0.0 copy, superseded by rules/primitives.mdc" },
+
+    ".agents/plugins/marketplace.json": { "kind": "extra", "category": "parity-bug-fixed", "reason": "codex-cli 0.154 rejects the root marketplace.json (\"marketplace root does not contain a supported manifest\") and lists no plugin for its {type: path} source; this file, with a {source: local} source, is what `codex plugin marketplace add` reads" },
+    "skills/lua-deploy/SKILL.md": { "kind": "content", "category": "parity-bug-fixed", "reason": "parity points at agents/agents/lua-deploy-pilot.md, a path that does not exist; the generator emits agents/lua-deploy-pilot.toml" },
+    "skills/lua-test/SKILL.md": { "kind": "content", "category": "parity-bug-fixed", "reason": "parity kept the Claude-only `subagent_type:` key; the generator emits `agent:`" },
+    "skills/lua-workflow/SKILL.md": { "kind": "content", "category": "parity-bug-fixed", "reason": "parity kept the Claude-only `subagent_type:` key; the generator emits `agent:`" }
+  }
+}

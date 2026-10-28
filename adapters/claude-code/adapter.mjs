@@ -21,6 +21,7 @@ export const mounts = [
   { from: 'packages/core/test/hooks', to: `${PLUGIN}/test/hooks`, exclude: ['before-shell-execution.test.mjs'] },
   { from: 'packages/core/test/lib', to: `${PLUGIN}/test/lib` },
   { from: 'packages/core/test/helpers', to: `${PLUGIN}/test/helpers` },
+  { from: 'tools/lint', to: `${PLUGIN}/scripts` },
   { from: 'src/agents', to: `${PLUGIN}/agents` },
   { from: 'qa/agents', to: `${PLUGIN}/agents` },
   { from: 'src/knowledge', to: `${PLUGIN}/lib/knowledge` },

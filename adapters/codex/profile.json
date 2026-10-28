@@ -1,0 +1,12 @@
+{
+  "host": "codex",
+  "displayName": "Codex",
+  "pluginRoot": "./",
+  "toolMatcher": "Bash|shell",
+  "hookFilters": false,
+  "hooksJsonStyle": { "inlineLeafObjectsInArrays": true },
+  "mcpStyle": { "inlinePrimitiveArrays": true },
+  "mcpEnvSpelling": "${env:NAME}",
+  "agentModelComment": "# model = \"gpt-5-codex\"  # uncomment to override; otherwise inherits from session",
+  "defaultHost": "codex"
+}

@@ -1,0 +1,42 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node ./hooks/check-lua-version.mjs", "timeout": 10 },
+          { "type": "command", "command": "node ./hooks/detect-project.mjs", "timeout": 5 },
+          { "type": "command", "command": "node ./hooks/check-lua-auth.mjs", "timeout": 15 }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node ./hooks/inject-context.mjs", "timeout": 5 }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|shell",
+        "hooks": [
+          { "type": "command", "command": "node ./hooks/approve-web-app.mjs", "timeout": 5 },
+          { "type": "command", "command": "node ./hooks/before-shell-execution.mjs", "timeout": 30 },
+          { "type": "command", "command": "node ./hooks/confirm-deploy.mjs", "timeout": 30 },
+          { "type": "command", "command": "node ./hooks/block-auto-deploy.mjs", "timeout": 5 },
+          { "type": "command", "command": "node ./hooks/block-device-secret.mjs", "timeout": 5 },
+          { "type": "command", "command": "node ./hooks/warn-version-zero.mjs", "timeout": 5 }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|shell",
+        "hooks": [
+          { "type": "command", "command": "node ./hooks/post-deploy-smoke.mjs", "timeout": 60 },
+          { "type": "command", "command": "node ./hooks/post-compile-summary.mjs", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}

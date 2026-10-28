@@ -1,0 +1,14 @@
+{
+  "name": "lua-ai-marketplace",
+  "displayName": "Lua AI Marketplace",
+  "description": "Lua AI's Codex CLI plugin catalog",
+  "plugins": [
+    {
+      "name": "lua-agent-builder",
+      "source": {
+        "type": "path",
+        "path": "./"
+      }
+    }
+  ]
+}

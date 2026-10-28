@@ -1,0 +1,34 @@
+{
+  "rules": {
+    "browser": {
+      "description": "Reference for the Lua cloud browser — reading a page, driving a real third-party site with Browser.execute, browser profiles and their allowed domains and confirm-actions policy, saved logins, cost caps, downloads and page scripts, and why a run is a production-shaped action no Lua verb undoes. Attach when the agent has to use a website that has no API. Manually attach via `@browser`."
+    },
+    "cli-reference": {
+      "description": "Reference for every lua-cli command, its flags, its exit codes and the version each one landed in, read from the CLI's own command definitions. Attach before running or recommending any `lua` command, when a flag errors out, or when deciding which command does a job. Manually attach via `@cli-reference`."
+    },
+    "decision-trees": {
+      "description": "Quick-reference flowcharts for routing a user task to a Lua primitive (which kind of agent, what storage, Q&A versus workflow versus scheduled, when a web app or a device belongs in the plan). Attach when the user describes what they want to build at a high level. Manually attach via `@decision-trees`."
+    },
+    "decisions": {
+      "description": "Reference for Lua Decisions — defining a decision, its questions and rules, calling it with Decisions.ask and Decisions.run, picking a provider and model, versioning and publishing, and reading a decision's cost and probabilities from the logs. Attach when the agent has to classify, route or score something rather than converse. Manually attach via `@decisions`."
+    },
+    "devices": {
+      "description": "Reference for Lua devices — connecting hardware or a local machine to an agent with defineDevice and defineDeviceTrigger, pairing and credentials, the fact that a pushed device is live on the agent's next turn with no version to roll back, and how to test a device safely. Attach when the agent has to read from or command something physical or local. Manually attach via `@devices`."
+    },
+    "integrations": {
+      "description": "Reference for connecting a Lua agent to external systems — the Unified.to catalog of 250+ SaaS connectors, the MCP-first architecture in which every integration auto-provisions an MCP server so custom tools are rarely needed, trigger and webhook discovery, and the decision tree for when a custom Tool is genuinely required. Attach when planning any agent that talks to an external system. Manually attach via `@integrations`."
+    },
+    "log-drains": {
+      "description": "Reference for Lua log drains — shipping an organization's agent logs to Datadog, an OTLP endpoint or a receiver of its own, the sources a drain can select, header and signing-secret handling, delivery inspection, replay and rotation. Attach when the user wants agent logs in their own observability stack. Manually attach via `@log-drains`."
+    },
+    "primitives": {
+      "description": "Reference for every Lua primitive and runtime API (LuaAgent, LuaSkill, LuaTool, LuaWebhook, LuaJob, LuaTrigger, LuaPreprocessor, LuaPostprocessor, LuaMCPServer, the Data/User/Agents/AI/Decisions/Browser APIs and the voice and e-commerce surfaces), with the shapes read from lua-cli source rather than the public docs. Attach when planning a Lua agent, scaffolding a primitive, writing tool code, or answering \"which primitive should I use for X?\". Manually attach via `@primitives`."
+    },
+    "web-apps": {
+      "description": "Reference for Lua web apps — scaffolding a page project, typed routes that run on the agent, the app client, look and theme, local preview, and how a web-app version is staged and then goes live with an agent version. Attach when the agent needs a web surface of its own rather than a messaging channel. Manually attach via `@web-apps`."
+    },
+    "workflows": {
+      "description": "Reference for Lua Workflows — defining a workflow, its steps and scripts, run control (start, approve, signal, cancel, resume, retry), schedules, goals, budgets, the model policy and consent gates, and how to read a run's logs and status. Attach when building or operating a multi-step or long-running process rather than a single agent turn. Manually attach via `@workflows`."
+    }
+  }
+}

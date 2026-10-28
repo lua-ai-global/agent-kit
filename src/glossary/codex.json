@@ -1,0 +1,261 @@
+{
+  "rules": [
+    {
+      "kinds": [
+        "skill",
+        "agent",
+        "rule"
+      ],
+      "pattern": "\\$\\{CLAUDE_PLUGIN_ROOT\\}/lib/knowledge/([a-z-]+)\\.md",
+      "replace": "@$1"
+    },
+    {
+      "kinds": [
+        "skill",
+        "agent",
+        "rule"
+      ],
+      "pattern": "\\$\\{CLAUDE_PLUGIN_ROOT\\}/agents/([a-z-]+)\\.md",
+      "replace": "agents/$1.toml"
+    },
+    {
+      "kinds": [
+        "skill",
+        "agent",
+        "rule"
+      ],
+      "pattern": "\\$\\{CLAUDE_PLUGIN_ROOT\\}/",
+      "replace": ""
+    },
+    {
+      "kinds": [
+        "skill",
+        "agent",
+        "rule"
+      ],
+      "pattern": "AskUserQuestion",
+      "replace": "ask-user-question"
+    },
+    {
+      "kinds": [
+        "skill",
+        "agent",
+        "rule"
+      ],
+      "pattern": "`(?:skill|subagent_type): ",
+      "replace": "`agent: "
+    },
+    {
+      "kinds": [
+        "skill",
+        "agent",
+        "rule"
+      ],
+      "pattern": "Skill tool",
+      "replace": "agent invocation"
+    },
+    {
+      "kinds": [
+        "skill",
+        "agent",
+        "rule"
+      ],
+      "pattern": "Claude Code",
+      "replace": "Codex"
+    }
+  ],
+  "files": {
+    "agents/lua-deploy-pilot.toml": [
+      {
+        "from": "- Every production verb is blocked in bare form by the `confirm-deploy` hook; the `LUA_DEPLOY_CONFIRMED=1` prefix is what the hook and the permission template's allow rules accept. If the prefixed command is nevertheless denied by the permission layer, the user's own `.claude/settings.json` (or a global one) carries a deny/ask rule such as `Bash(lua deploy*)` or `Bash(lua *)` that Codex evaluates past the env prefix — report that rule and stop; do not try another spelling. Never use `--auto-deploy`.",
+        "to": "- Every production verb is blocked in bare form by the `confirm-deploy` hook; the `LUA_DEPLOY_CONFIRMED=1` prefix is what the hook and the permission template's allow rules accept. If the prefixed command is nevertheless denied by the permission layer, the user's own `.claude/settings.json` (or a global one) carries a deny/ask rule such as `Bash(lua deploy*)` or `Bash(lua *)` that is evaluated past the env prefix — report that rule and stop; do not try another spelling. Never use `--auto-deploy`."
+      }
+    ],
+    "hooks/approve-web-app.mjs": [
+      {
+        "from": "// Returning null leaves the command to Claude Code's normal permission flow",
+        "to": "// Returning null leaves the command to the host's normal permission flow"
+      }
+    ],
+    "hooks/block-auto-deploy.mjs": [
+      {
+        "from": "// at the Claude Code permission layer; this hook is defence-in-depth for",
+        "to": "// at the permission layer; this hook is defence-in-depth for"
+      },
+      {
+        "from": "        'DEPLOY_DENIED_AUTO: --auto-deploy is never the right choice from inside Claude Code. ' +",
+        "to": "        'DEPLOY_DENIED_AUTO: --auto-deploy is never the right choice from inside a model-run session. ' +"
+      }
+    ],
+    "hooks/check-lua-auth.mjs": [
+      {
+        "from": "// credential — \"run /lua-auth\" would send the model into an AskUserQuestion\n// flow that cannot complete in `claude -p`.",
+        "to": "// credential — \"run /lua-auth\" would send the model into a flow that has to\n// ask the user something, which an unattended run cannot complete."
+      }
+    ],
+    "hooks/check-lua-version.mjs": [
+      {
+        "from": "// `/lua-drains`, `lib/knowledge/log-drains.md`) and the `lua logs` read window",
+        "to": "// `/lua-drains`, the `@log-drains` rule) and the `lua logs` read window"
+      }
+    ],
+    "hooks/confirm-deploy.mjs": [
+      {
+        "from": "// PreToolUse hook for every production-affecting lua-cli verb.",
+        "to": "// PreToolUse / beforeShellExecution hook for every production-affecting\n// lua-cli verb."
+      },
+      {
+        "from": "// Registered for EVERY Bash call (no `if` glob in hooks.json): the\n// classification lives in lib/tokenizer.mjs, which also knows the CLI's\n// action aliases (`publish`, `on`, `enable`, `submit`, `rollout`, …) and the\n// three installed binaries (`lua`, `heylua`, `lua-ai`). A glob list would\n// have to be kept in sync with all of that; a single classifier cannot\n// drift. Non-production commands return null immediately (allow).",
+        "to": "// THIS HOOK IS THE GATE, not a second line. The permission layer cannot\n// express \"deny the bare verb but allow the prefixed one\": a deny or ask rule\n// matches past any leading env assignment, so a `Bash(lua deploy*)` deny\n// would also block `LUA_DEPLOY_CONFIRMED=1 lua deploy …` and no deploy could\n// ever run. lib/permissions-template.json therefore lists only the prefixed\n// forms, and a block from this hook takes precedence over any allow rule,\n// including a broad `Bash(lua *)` in the user's own settings.\n//\n// It gates every verb that changes production, not only `lua deploy`. The\n// earlier version tested `/\\blua\\s+deploy\\b/` and returned null for anything\n// else, so `lua version promote 3` — an atomic swap of the live agent\n// version, with no CLI confirmation of its own — `lua skills deploy`,\n// `lua mcp activate`, `lua workflows activate`, `lua persona production\n// deploy` and `lua marketplace template publish` all went straight through.\n// The set lives in lib/tokenizer.mjs, which also knows the CLI's action\n// aliases (`publish`, `on`, `enable`, `submit`, `rollout`, …) and the three\n// installed binaries (`lua`, `heylua`, `lua-ai`); a glob list here would\n// have to be kept in sync with all of that, and a single classifier cannot\n// drift. Non-production commands return null immediately.\n//\n// The classifier reads the WHOLE command — every simple command in a\n// `&&`/`;`/`||`/pipe chain, subshells, substitutions, strings run by another\n// shell, env-assignment prefixes, launchers (`npx lua`, `pnpm exec lua`,\n// `node …/lua`) and binary paths — and accepts the prefix only on the very\n// simple command that runs the verb. The regex it replaced was anchored at\n// the start of the string, so `cd x && lua deploy all`, `npx lua deploy all`\n// and `/usr/local/bin/lua deploy all` were unreachable to it."
+      },
+      {
+        "from": "// THIS HOOK IS THE GATE, not a second line. Claude Code's permission layer\n// cannot express \"deny the bare verb but allow the prefixed one\": deny/ask\n// rules match past any leading env assignment (code.claude.com/docs/en/\n// permissions, verified live 2026-09-12), so a `Bash(lua deploy*)` deny would\n// also block `LUA_DEPLOY_CONFIRMED=1 lua deploy …`. lib/permissions-template.json\n// therefore lists only the prefixed forms (allow) and nothing for the bare\n// forms; an exit-2 block from this hook takes precedence over any allow rule,\n// including a broad `Bash(lua *)` in the user's own settings.",
+        "to": "// Headless (LUA_PLUGIN_HEADLESS=1) the prefix is void: nobody is there to\n// confirm, so every production verb is blocked and the block names no skill."
+      },
+      {
+        "from": "// 1.6.0 (EM-WS8): the classifier reads the whole command — every simple\n// command in a `&&`/`;`/`||`/pipe chain, subshells, substitutions, strings run\n// by another shell, env-assignment prefixes, launchers (`npx lua`, `npx\n// lua-cli`, `pnpm exec lua`, `node …/lua`) and binary paths — and accepts\n// the prefix only on the very simple command that runs the verb. Headless\n// (LUA_PLUGIN_HEADLESS=1) the prefix is void: nobody is there to confirm, so\n// every production verb is blocked and the block names no slash command.\n// It remains a belt; in the Lua Job tier the Lua-API proxy is the boundary.",
+        "to": "// The hook does its own filtering rather than relying on the `matcher` field\n// in hooks.json. Matcher semantics vary between hosts, and when the matcher\n// did not apply, the old \"not prefixed\" branch fired for EVERY shell command\n// and blocked them all."
+      },
+      {
+        "from": "        'DEPLOY_DENIED_AUTO: --auto-deploy is never appropriate from inside Claude Code ' +",
+        "to": "        'DEPLOY_DENIED_AUTO: --auto-deploy is never appropriate from inside a model-run session ' +"
+      },
+      {
+        "from": "          : 'Use /lua-deploy instead — it spawns the deploy-pilot subagent which gates each step.'),",
+        "to": "          : 'Use /lua-deploy instead — it invokes the deploy-pilot agent, which gates each step.'),"
+      },
+      {
+        "from": "  if (classified.prefixed) return null;  // User-authorised via the slash flow — allow",
+        "to": "  if (classified.prefixed) return null;  // User-authorised via the skill flow — allow"
+      },
+      {
+        "from": "      `LUA_DEPLOY_CONFIRMED=1 prefix. Use ${classified.slash} (it collects your single confirmation per the §3.7 ` +\n      'contract, then emits the prefixed form). The prefix counts only as the first word of the simple command ' +\n      'that runs the verb, with the binary spelled `lua` — not in a pipe, subshell, `$(…)`, `bash -c` string, ' +\n      'or through npx/pnpm/node/a path, and it confirms only that one command in a chain.',",
+        "to": "      `LUA_DEPLOY_CONFIRMED=1 prefix. Use ${classified.slash} (it collects your single confirmation per the ` +\n      '§3.7 contract, then emits the prefixed form). The prefix counts only as the first word of the simple ' +\n      'command that runs the verb, with the binary spelled `lua` — not in a pipe, subshell, `$(…)`, ' +\n      '`bash -c` string, or through npx/pnpm/node/a path, and it confirms only that one command in a chain.',"
+      }
+    ],
+    "hooks/detect-project.mjs": [
+      {
+        "from": "// Detects whether the user opened Claude Code in a Lua agent project",
+        "to": "// Detects whether the user opened the session in a Lua agent project"
+      },
+      {
+        "from": " * Iteration-13 audit: prefers `input.cwd` (the user's actual CWD per the\n * Claude Code hook payload) over `process.cwd()` (which is Claude Code's\n * startup CWD — not necessarily where the user's project lives if they\n * opened Claude Code in their home dir and `cd`'d to the project later).\n * Test injection point retained as `opts.cwd` for backward compat.",
+        "to": " * Prefers `input.cwd` (the user's actual CWD, from the hook payload) over\n * `process.cwd()`, which is the session's startup CWD — not necessarily where\n * the project lives, if the user started in their home directory and `cd`'d\n * to the project later. Test injection point retained as `opts.cwd`."
+      },
+      {
+        "from": " * @param {{cwd?: string}|null} input — Claude Code hook payload",
+        "to": " * @param {{cwd?: string}|null} input — the hook payload"
+      }
+    ],
+    "hooks/post-deploy-smoke.mjs": [
+      {
+        "from": "  // Defensive: PostToolUse only fires for SUCCESSFUL tool calls per\n  // https://code.claude.com/docs/en/hooks (failures go to PostToolUseFailure\n  // which the plugin doesn't subscribe to). So this branch is unreachable\n  // in current Claude Code. Kept as a forward-compat guard in case the\n  // event semantics ever change — costs nothing at runtime.",
+        "to": "  // Defensive: PostToolUse fires only for SUCCESSFUL tool calls, so this\n  // branch is unreachable today. Kept as a forward-compatibility guard in\n  // case the event semantics change — it costs nothing at runtime."
+      }
+    ],
+    "lib/headless.mjs": [
+      {
+        "from": "// Headless mode (EM-WS8, 1.6.0). See docs/JOB_TIER.md at the repository root.",
+        "to": "// Headless mode. See docs/TESTERS.md for how the plugin behaves unattended."
+      },
+      {
+        "from": "// plugin runs inside `claude -p` in the Lua Job tier (or any other",
+        "to": "// plugin runs inside a non-interactive Codex invocation (or any other"
+      },
+      {
+        "from": "//   * no hook message points at a slash command. The slashes that fix things\n//     (/lua-auth, /lua-doctor, /lua-update, /lua-deploy, /lua-template) all\n//     need AskUserQuestion or the Agent tool, both unavailable headless, and a\n//     message naming them steers the model into a flow that cannot complete;",
+        "to": "//   * no hook message points at a skill. The skills that fix things\n//     (lua-auth, lua-doctor, lua-update, lua-deploy, lua-template) all need\n//     to ask the user something or to invoke another agent, neither of which\n//     is available headless, and a message naming one steers the model into\n//     a flow that cannot complete;"
+      },
+      {
+        "from": "//     prefix means \"a person confirmed this deploy\"; headless, the model would\n//     be confirming to itself. Every production verb is blocked (fail closed);\n//     production changes are made outside the run;",
+        "to": "//     prefix means \"a person confirmed this deploy\"; headless, the model\n//     would be confirming to itself. Every production verb is blocked (fail\n//     closed); production changes are made outside the run;"
+      },
+      {
+        "from": "/** The sentence every headless message ends with instead of a slash command. */",
+        "to": "/** The sentence every headless message ends with instead of a skill name. */"
+      }
+    ],
+    "mcp/lua-platform/dist/server.js": [
+      {
+        "from": "\"X-Lua-Client\":\"claude-plugin/",
+        "to": "\"X-Lua-Client\":\"codex-plugin/"
+      }
+    ],
+    "mcp/lua-platform/tests/api-client.test.mjs": [
+      {
+        "from": "toBe(`claude-plugin/${PLUGIN_PACKAGE.version}`)",
+        "to": "toBe(`codex-plugin/${PLUGIN_PACKAGE.version}`)"
+      }
+    ],
+    "mcp/lua-platform/src/api-client.mjs": [
+      {
+        "from": "'X-Lua-Client': 'claude-plugin/",
+        "to": "'X-Lua-Client': 'codex-plugin/"
+      }
+    ],
+    "rules/cli-reference.mdc": [
+      {
+        "from": "| `--ci` | Program-level flag, accepted anywhere on the line. Prompts go through `safePrompt` (`src/utils/prompt-handler.ts`), which under `--ci` throws `Interactive prompt required but --ci flag is set. Provide all required flags or arguments.` → **exit 1** — that is what `lua devices <action>` without `--device-name`, `lua devices test` / `test-trigger` on lua-cli 3.44 and older (they always prompt for the command / trigger name; ⏳ 3.45.0 takes `--command` / `--trigger` — devices.md §4), `lua governance`, `lua skills production` and `lua persona sandbox` do; they do **not** hang. `lua version create` (no `-m`) and `lua version delete` (no `--force`) **skip** their prompts under `--ci`: create proceeds with an empty message, delete proceeds **unconfirmed** (`src/commands/version.ts` ~58-61, ~439-450). A few commands still call `inquirer.prompt` directly and bypass the `--ci` guard: bare `lua env`, `lua pull` without `--force`, `lua auth logout` / `lua auth key` without `--force`, `lua chat` without `-m`/`-e`, and `lua test skill` without `--name` (its tool picker). On a TTY those block; with no TTY — Codex's Bash — inquirer hits EOF, the CLI prints the menu and **exits 0 having done nothing** (`src/utils/cli.ts` `ExitPromptError` → `process.exit(0)`): a false success, so never trust the exit code of a command that may have prompted. Always pass complete flags |",
+        "to": "| `--ci` | Program-level flag, accepted anywhere on the line. Prompts go through `safePrompt` (`src/utils/prompt-handler.ts`), which under `--ci` throws `Interactive prompt required but --ci flag is set. Provide all required flags or arguments.` → **exit 1** — that is what `lua devices <action>` without `--device-name`, `lua devices test` / `test-trigger` on lua-cli 3.44 and older (they always prompt for the command / trigger name; ⏳ 3.45.0 takes `--command` / `--trigger` — devices.md §4), `lua governance`, `lua skills production` and `lua persona sandbox` do; they do **not** hang. `lua version create` (no `-m`) and `lua version delete` (no `--force`) **skip** their prompts under `--ci`: create proceeds with an empty message, delete proceeds **unconfirmed** (`src/commands/version.ts` ~58-61, ~439-450). A few commands still call `inquirer.prompt` directly and bypass the `--ci` guard: bare `lua env`, `lua pull` without `--force`, `lua auth logout` / `lua auth key` without `--force`, `lua chat` without `-m`/`-e`, and `lua test skill` without `--name` (its tool picker). On a TTY those block; with no TTY — a shell the model runs — inquirer hits EOF, the CLI prints the menu and **exits 0 having done nothing** (`src/utils/cli.ts` `ExitPromptError` → `process.exit(0)`): a false success, so never trust the exit code of a command that may have prompted. Always pass complete flags |"
+      },
+      {
+        "from": "| ⏳ 3.38.0 `lua drains [list\\|status\\|deliveries\\|create\\|update\\|delete\\|test\\|verify\\|pause\\|resume\\|rotate-secret] [id] [--org <id>] [--json]` | **log drains** — copies the ORGANIZATION's agent log records to a destination it owns (`http` · `otlp` · `datadog` · `betterstack`). An org resource, so no project directory is needed: `--org`, else `lua.skill.yaml`, else the credential when it reaches exactly one org (several → exit 2 listing the ids). Needs **`logs:manage`**, a SENSITIVE scope a wildcard does not satisfy (missing → exit 10, one line, no `💡` block); reading the records themselves is `logs:read`. ⚠ `status` exits **2** when ANY drain is `failing` — the same code as a usage error, set AFTER printing, so decide from `drains[].state` in `--json`. `test`/`verify` are 202-then-poll (30 s / 60 s; `pending: true` and exit 1 when nothing landed — not a failure to send). Secrets are never flags: `--header <NAME>` prompts hidden, `--header-from-env <NAME>=<ENV_VAR>` is the `--ci` form, and the HMAC signing secret is minted server-side and printed exactly once (create, and `rotate-secret` without `--finalize`). Under `--json` stdout is the machine's and the verification/acknowledgement chrome goes to stderr. Every verb answers 404 → exit 3 until the org is enabled. Full reference: `lib/knowledge/log-drains.md`; the slash is `/lua-drains`. ⏳ **lua-cli 3.44.0** adds six destination types (`splunk`, `loki`, `axiom`, `newrelic`, `sumologic`, and `s3` for S3/R2/GCS buckets via `--provider`, `--bucket`, `--region`, `--prefix`, `--credentials-from-env KEY_ID_VAR=SECRET_VAR` or `--role-arn`/`--external-id`) and two verbs: `confirm <id> --token <t>` (settles a write-only bucket's ownership challenge) and `replay <id> <batchId>` (re-enqueues a refused batch inside the 6 h horizon); both sit in `ask`. `/lua-drains` still drives the four original types; use the CLI's `--help` for the others | RO for `list`/`status`/`deliveries`/`test`; **S** for the others (org config, `ask` tier — not a `P` deploy verb) |\n| ⏳ 3.48.0 `lua decisions [list\\|versions <name>\\|run <name>\\|publish <name> <version>\\|delete <name>] [--json] [--force] [--state <json> \\| --message <text>] [--provider jev\\|openai\\|openrouter\\|auto] [--model <id>] [--min-confidence <n>]` | **named decisions** (`LuaDecision`) on the project's AGENT: `list` (default; aliases `ls`/`view`) shows each active decision with its current version and source; `versions` (`history`/`list-versions`) lists versions newest first with questions, provider and `minConfidence`, and also finds a deleted decision; `run` (`try`/`test`) runs the CURRENT version on `--message` (sent as `{ message }`) or `--state` (any JSON; both → exit 2, an empty message → exit 2) and prints one line per answer then provider, rule, model, duration, tokens, fallback — `--provider`/`--model`/`--min-confidence` override the version for that call only, and ⏳ **3.49.2** a `vendor/model` id such as `liquid/d1` runs on OpenRouter (`--provider openrouter` without `--model` is exit 2; a `typesafe/…` or `openai/…` id with it is refused naming the provider to use); `publish` (`rollback`/`deploy`) makes that version current at once, prints `old → new` with the questions added/removed, asks unless `--force`/`--ci`, and on a deleted decision turns it back on (409 → exit 10 when another decision took the name); `delete` (`rm`/`remove`/`del`) deactivates and keeps the versions (asks; `--force` required in CI, else exit 2). A failed `run` prints the decision error's own message: a 503 (`decision_timeout`/`decision_unavailable`/`decision_disabled`) exits 11, `decision_rejected` (422) is the model refusing the request itself and never falls back. `lua push decision --name <n>` stages a version (first push writes 1.0.1); it goes live with `lua version promote` or `publish`. `lua version status` shows live vs pinned vs yaml per decision. Rows: `lua logs --type decisions`. Full reference: `lib/knowledge/decisions.md`; the slash is `/lua-decisions`, scaffolding is `/lua-new decision` | RO for `list`/`versions`/`run` (a run is one billed call, 0.005 actions on Jev, 0.01 otherwise); **S** for `publish`/`delete` (agent config, `ask` tier — not a `P` deploy verb) |\n| ⏳ 3.49.0 `lua browser read <url> [--selector <css>] [--format text\\|html] [--wait-for <load\\|networkidle\\|css>] [-e sandbox\\|production] [--agent-id <id>] [--json]` · `lua browser run \"<task>\" [--start-url <url>] [--schema <file.json>] [--max-steps <n>] [--max-cost <usd>] [--login <name>]… [-e] [--agent-id <id>] [--json]` | the agent's **cloud browser** from the terminal, on the platform, under the agent's **pushed** browser policy (engine, fallback, `allowedDomains`, `confirmActions`, `logContent`) — local code reaches it only after `lua push browser` + `lua push agent`. Needs `browser: true` or at least one named browser, else 409 `BROWSER_DISABLED`; the key needs `agents:write` on the agent (403). `read` opens one page in a new session, waits for `--wait-for`, prints title, final URL, engine, the HTTP status when it is not 200, `Matches:` for a `--selector`, `Blocked:`/`Guidance:` on a sign-in or bot wall, then the content (60 s). `run` prints `step N: <action> on <url>` as each step arrives, then status, steps, cost, engine, final URL and output, and `Waiting for confirmation:` when an action in `confirmActions` is held; `--max-steps` is 1–60 (default 25) and `--max-cost` 0.01–10 USD (default 1). ⏳ **3.57.0** `--login <name>` signs the run in with one of **your own** saved logins first, repeatable up to 5 (a code or a check pauses the run and emails you a private link; ⏳ **3.58.0** adds the files and page-script settings a browser may carry). A run has 5 minutes, the CLI stops waiting after 6 and exits 1, and `Ctrl-C` cancels it **on the server** (exit 130). `-e` only TAGS the log rows (`dev` channel) — the browser, policy and cost are identical. ⚠ `--json` prints the raw envelope (`{ engine, data, error?, code? }` / `{ id, status, result }`) and **exits 0 even when the call failed**: read `error`/`code`, never the exit code. At most **2** CLI reads and runs at once per agent (429 `BROWSER_CLI_CONCURRENCY`; a slot frees itself within 6 min), paused limiter 503 `BROWSER_CLI_LIMITER_UNAVAILABLE`. ⏳ **3.49.2** checks `-e`, `--format`, the caps, the URLs, an empty task, the `--schema` file and the `--login` names locally (exit 2) before anything is sent. Rows: `lua logs --type browser`. Full reference: `lib/knowledge/browser.md`; the slash is `/lua-browser`, scaffolding is `/lua-new browser` | RO for `read` (one session, no model calls, nothing changed); **S/P-shaped** for `run` — it acts on a real third-party site and spends model budget, so it sits in the `ask` tier (not a `P` deploy verb: no Lua state changes) |",
+        "to": "| ⏳ 3.38.0 `lua drains [list\\|status\\|deliveries\\|create\\|update\\|delete\\|test\\|verify\\|pause\\|resume\\|rotate-secret] [id] [--org <id>] [--json]` | **log drains** — copies the ORGANIZATION's agent log records to a destination it owns (`http` · `otlp` · `datadog` · `betterstack`). An org resource, so no project directory is needed: `--org`, else `lua.skill.yaml`, else the credential when it reaches exactly one org (several → exit 2 listing the ids). Needs **`logs:manage`**, a SENSITIVE scope a wildcard does not satisfy (missing → exit 10, one line, no `💡` block); reading the records themselves is `logs:read`. ⚠ `status` exits **2** when ANY drain is `failing` — the same code as a usage error, set AFTER printing, so decide from `drains[].state` in `--json`. `test`/`verify` are 202-then-poll (30 s / 60 s; `pending: true` and exit 1 when nothing landed — not a failure to send). Secrets are never flags: `--header <NAME>` prompts hidden, `--header-from-env <NAME>=<ENV_VAR>` is the `--ci` form, and the HMAC signing secret is minted server-side and printed exactly once (create, and `rotate-secret` without `--finalize`). Under `--json` stdout is the machine's and the verification/acknowledgement chrome goes to stderr. Every verb answers 404 → exit 3 until the org is enabled. Full reference: `@log-drains`; the slash is `/lua-drains`. ⏳ **lua-cli 3.44.0** adds six destination types (`splunk`, `loki`, `axiom`, `newrelic`, `sumologic`, and `s3` for S3/R2/GCS buckets via `--provider`, `--bucket`, `--region`, `--prefix`, `--credentials-from-env KEY_ID_VAR=SECRET_VAR` or `--role-arn`/`--external-id`) and two verbs: `confirm <id> --token <t>` (settles a write-only bucket's ownership challenge) and `replay <id> <batchId>` (re-enqueues a refused batch inside the 6 h horizon); both sit in `ask`. `/lua-drains` still drives the four original types; use the CLI's `--help` for the others | RO for `list`/`status`/`deliveries`/`test`; **S** for the others (org config, `ask` tier — not a `P` deploy verb) |\n| ⏳ 3.48.0 `lua decisions [list\\|versions <name>\\|run <name>\\|publish <name> <version>\\|delete <name>] [--json] [--force] [--state <json> \\| --message <text>] [--provider jev\\|openai\\|openrouter\\|auto] [--model <id>] [--min-confidence <n>]` | **named decisions** (`LuaDecision`) on the project's AGENT: `list` (default; aliases `ls`/`view`) shows each active decision with its current version and source; `versions` (`history`/`list-versions`) lists versions newest first with questions, provider and `minConfidence`, and also finds a deleted decision; `run` (`try`/`test`) runs the CURRENT version on `--message` (sent as `{ message }`) or `--state` (any JSON; both → exit 2, an empty message → exit 2) and prints one line per answer then provider, rule, model, duration, tokens, fallback — `--provider`/`--model`/`--min-confidence` override the version for that call only, and ⏳ **3.49.2** a `vendor/model` id such as `liquid/d1` runs on OpenRouter (`--provider openrouter` without `--model` is exit 2; a `typesafe/…` or `openai/…` id with it is refused naming the provider to use); `publish` (`rollback`/`deploy`) makes that version current at once, prints `old → new` with the questions added/removed, asks unless `--force`/`--ci`, and on a deleted decision turns it back on (409 → exit 10 when another decision took the name); `delete` (`rm`/`remove`/`del`) deactivates and keeps the versions (asks; `--force` required in CI, else exit 2). A failed `run` prints the decision error's own message: a 503 (`decision_timeout`/`decision_unavailable`/`decision_disabled`) exits 11, `decision_rejected` (422) is the model refusing the request itself and never falls back. `lua push decision --name <n>` stages a version (first push writes 1.0.1); it goes live with `lua version promote` or `publish`. `lua version status` shows live vs pinned vs yaml per decision. Rows: `lua logs --type decisions`. Full reference: `@decisions`; the slash is `/lua-decisions`, scaffolding is `/lua-new decision` | RO for `list`/`versions`/`run` (a run is one billed call, 0.005 actions on Jev, 0.01 otherwise); **S** for `publish`/`delete` (agent config, `ask` tier — not a `P` deploy verb) |\n| ⏳ 3.49.0 `lua browser read <url> [--selector <css>] [--format text\\|html] [--wait-for <load\\|networkidle\\|css>] [-e sandbox\\|production] [--agent-id <id>] [--json]` · `lua browser run \"<task>\" [--start-url <url>] [--schema <file.json>] [--max-steps <n>] [--max-cost <usd>] [--login <name>]… [-e] [--agent-id <id>] [--json]` | the agent's **cloud browser** from the terminal, on the platform, under the agent's **pushed** browser policy (engine, fallback, `allowedDomains`, `confirmActions`, `logContent`) — local code reaches it only after `lua push browser` + `lua push agent`. Needs `browser: true` or at least one named browser, else 409 `BROWSER_DISABLED`; the key needs `agents:write` on the agent (403). `read` opens one page in a new session, waits for `--wait-for`, prints title, final URL, engine, the HTTP status when it is not 200, `Matches:` for a `--selector`, `Blocked:`/`Guidance:` on a sign-in or bot wall, then the content (60 s). `run` prints `step N: <action> on <url>` as each step arrives, then status, steps, cost, engine, final URL and output, and `Waiting for confirmation:` when an action in `confirmActions` is held; `--max-steps` is 1–60 (default 25) and `--max-cost` 0.01–10 USD (default 1). ⏳ **3.57.0** `--login <name>` signs the run in with one of **your own** saved logins first, repeatable up to 5 (a code or a check pauses the run and emails you a private link; ⏳ **3.58.0** adds the files and page-script settings a browser may carry). A run has 5 minutes, the CLI stops waiting after 6 and exits 1, and `Ctrl-C` cancels it **on the server** (exit 130). `-e` only TAGS the log rows (`dev` channel) — the browser, policy and cost are identical. ⚠ `--json` prints the raw envelope (`{ engine, data, error?, code? }` / `{ id, status, result }`) and **exits 0 even when the call failed**: read `error`/`code`, never the exit code. At most **2** CLI reads and runs at once per agent (429 `BROWSER_CLI_CONCURRENCY`; a slot frees itself within 6 min), paused limiter 503 `BROWSER_CLI_LIMITER_UNAVAILABLE`. ⏳ **3.49.2** checks `-e`, `--format`, the caps, the URLs, an empty task, the `--schema` file and the `--login` names locally (exit 2) before anything is sent. Rows: `lua logs --type browser`. Full reference: `@browser`; the slash is `/lua-browser`, scaffolding is `/lua-new browser` | RO for `read` (one session, no model calls, nothing changed); **S/P-shaped** for `run` — it acts on a real third-party site and spends model budget, so it sits in the `ask` tier (not a `P` deploy verb: no Lua state changes) |"
+      }
+    ],
+    "rules/devices.mdc": [
+      {
+        "from": "- **Without `--out` the secret is printed once to stdout.** In Codex that is the conversation transcript, so the plugin **always** passes `--out` — the `block-device-secret` hook blocks the command otherwise — and never `cat`s, `source`s, `grep`s, `head`s or echoes the file. Never pass `--force` unless the user asked to replace the file.",
+        "to": "- **Without `--out` the secret is printed once to stdout.** In a model-run session that is the conversation transcript, so the plugin **always** passes `--out` — the `block-device-secret` hook blocks the command otherwise — and never `cat`s, `source`s, `grep`s, `head`s or echoes the file. Never pass `--force` unless the user asked to replace the file."
+      }
+    ],
+    "rules/integrations.mdc": [
+      {
+        "from": "Then the only custom code is (a) a `LuaWebhook` or `defineTrigger` that reacts to the subscribed events and (b) tools for derived logic (e.g. `find_optimal_meeting_slot`). Discover the MCP's actual tool names before planning anything custom: in a Codex session the connection's tools show up as `mcp__<integration>__<tool>`, or run `lua chat --ci -e sandbox -m \"List every tool you have available, grouped by source. Do not call any.\" -t mcp-discovery-1` and let the agent recite its surface.",
+        "to": "Then the only custom code is (a) a `LuaWebhook` or `defineTrigger` that reacts to the subscribed events and (b) tools for derived logic (e.g. `find_optimal_meeting_slot`). Discover the MCP's actual tool names before planning anything custom: in a session with the connection's MCP activated its tools show up as `mcp__<integration>__<tool>`, or run `lua chat --ci -e sandbox -m \"List every tool you have available, grouped by source. Do not call any.\" -t mcp-discovery-1` and let the agent recite its surface."
+      }
+    ],
+    "rules/web-apps.mdc": [
+      {
+        "from": "- **The plugin's use:** it is safe to run — nothing goes live and nothing is sent — so after `lua push webapp` the plugin may offer it and, when the user wants to click through, run it and hand over the link. It is in no permission list, so Codex asks once before it runs. Never present a preview as \"deployed\": only `/lua-deploy webapp` makes a version live.",
+        "to": "- **The plugin's use:** it is safe to run — nothing goes live and nothing is sent — so after `lua push webapp` the plugin may offer it and, when the user wants to click through, run it and hand over the link. It is in no permission list, so the host asks once before it runs. Never present a preview as \"deployed\": only `/lua-deploy webapp` makes a version live."
+      }
+    ],
+    "skills/lua-architect/SKILL.md": [
+      {
+        "from": "The plan ends with a \"Next steps\" menu: `/lua-init`, `/lua-new <type> <name>`, `/lua-test`, `/lua-workflow run <name>`, `/lua-qa`, `/lua-deploy`, `/lua-template`. The user picks; nothing is auto-built. If the user says \"go\", drive those slashes in order via the agent invocation — each keeps its own single permission interaction.",
+        "to": "The plan ends with a \"Next steps\" menu: `/lua-init`, `/lua-new <type> <name>`, `/lua-test`, `/lua-workflow run <name>`, `/lua-qa`, `/lua-deploy`, `/lua-template`. The user picks; nothing is auto-built. If the user says \"go\", drive those skills in order via the agent invocation — each keeps its own single permission interaction."
+      }
+    ],
+    "skills/lua-docs/SKILL.md": [
+      {
+        "from": "The knowledge files in `lib/knowledge/` (`primitives.md`, `workflows.md`, `cli-reference.md`, `integrations.md`, `decision-trees.md`) were verified against lua-cli 3.33.0 source and are more reliable than the public docs where the two disagree. `Grep` them for the topic.",
+        "to": "The rule files in `rules/` (`@primitives`, `@workflows`, `@cli-reference`, `@integrations`, `@decision-trees`, `@decisions`, `@devices`, `@web-apps`, `@browser`, `@log-drains`) were verified against lua-cli source and are more reliable than the public docs where the two disagree. Attach the relevant one, or grep `rules/` for the topic."
+      },
+      {
+        "from": "- `mcp__plugin_lua-agent-builder_lua-docs__search_lua_cli` with the user's question (semantic search with page links). That is the name Codex gives the plugin's `lua-docs` server; if it is absent but the same tool exists under the plain `lua-docs` server prefix (the user registered the docs server themselves), use that one — same tool.",
+        "to": "- `mcp__plugin_lua-agent-builder_lua-docs__search_lua_cli` with the user's question (semantic search with page links). That is the name the host gives the plugin's `lua-docs` server; if it is absent but the same tool exists under the plain `lua-docs` server prefix (the user registered the docs server themselves), use that one — same tool."
+      }
+    ],
+    "skills/lua-doctor/SKILL.md": [
+      {
+        "from": "Run `Bash(lua --version)`. Not installed → ask-user-question to install via `npm install -g lua-cli`. Installed but below `PINNED_MIN_LUA_CLI` in `hooks/check-lua-version.mjs` (3.37.0 — the plugin's knowledge describes workflow verbs that do not exist below 3.36.0 and cost read-outs that only 3.37.0 prints) → point at `/lua-update`.",
+        "to": "Run `Bash(lua --version)`. Not installed → ask-user-question to install via `npm install -g lua-cli`. Installed but below `PINNED_MIN_LUA_CLI` in `hooks/check-lua-version.mjs` (the plugin's rules describe workflow verbs that do not exist below 3.36.0 and cost read-outs that only 3.37.0 prints) → point at `/lua-update`."
+      },
+      {
+        "from": "Codex ignores a plugin's own `settings.json` `permissions` block, so the plugin ships `lib/permissions-template.json` and merges it into the project's `.claude/settings.json` on consent:",
+        "to": "A plugin's own `settings.json` `permissions` block is silently ignored by the host, so the plugin ships `lib/permissions-template.json` and merges it into the project's `.claude/settings.json` on consent:"
+      },
+      {
+        "from": "- Before merging, check the user's existing `deny` and `ask` arrays for any rule that matches a bare production verb (`lua deploy*`, `lua * deploy*`, `lua workflows deploy*`, `lua workflows activate*`, `lua version promote*`, `lua mcp activate*`, `lua marketplace template publish*|apply*`, or a catch-all like `lua *`). Codex evaluates deny/ask rules past a leading env assignment, so such a rule also blocks the confirmed `LUA_DEPLOY_CONFIRMED=1 …` form and `/lua-deploy` can never go live. If you find one, name it in the report and tell the user to remove it — do not delete it yourself. (Production verbs are gated by the `confirm-deploy` hook, not by deny rules.)",
+        "to": "- Before merging, check the user's existing `deny` and `ask` arrays for any rule that matches a bare production verb (`lua deploy*`, `lua * deploy*`, `lua workflows deploy*`, `lua workflows activate*`, `lua version promote*`, `lua mcp activate*`, `lua marketplace template publish*|apply*`, or a catch-all like `lua *`). A deny or ask rule matches past a leading env assignment, so such a rule also blocks the confirmed `LUA_DEPLOY_CONFIRMED=1 …` form and `/lua-deploy` can never go live. If you find one, name it in the report and tell the user to remove it — do not delete it yourself. (Production verbs are gated by the `confirm-deploy` hook, not by deny rules.)"
+      }
+    ],
+    "skills/lua-init/SKILL.md": [
+      {
+        "from": "2. **Version probe** (informational): `Bash(lua --version)`. If below the plugin's pinned minimum (`PINNED_MIN_LUA_CLI` in `hooks/check-lua-version.mjs`, currently 3.37.0), use the **agent invocation** with `agent: \"lua-update\"` — that slash asks its own confirmation. If declined, continue with the older CLI.",
+        "to": "2. **Version probe** (informational): `Bash(lua --version)`. If below the plugin's pinned minimum (`PINNED_MIN_LUA_CLI` in `hooks/check-lua-version.mjs`), use the **agent invocation** with `agent: \"lua-update\"` — that slash asks its own confirmation. If declined, continue with the older CLI."
+      }
+    ]
+  }
+}
