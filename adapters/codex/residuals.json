@@ -59,6 +59,7 @@
     "test/lib/host.test.mjs": { "kind": "extra", "category": "host-runtime", "reason": "unit tests for lib/host.mjs" },
     "hooks/before-shell-execution.mjs": { "kind": "content", "category": "kit-fix", "reason": "uses the shared lib/lua-bin.mjs pattern, which adds lua-cli, launcher extensions, quoted shell strings and case-insensitive matching" },
     "lib/permissions-template.json": { "kind": "content", "category": "kit-consistency", "reason": "one rule set on every host: the Codex-only `lua sync --accept*` allow and `lua sync --accept --force*` ask rows are dropped, matching Claude Code; --accept is a legacy alias of --pull that the plugin never emits and the Claude lint denylists, so it falls to the host prompt" },
+    "test/lib/permissions-credentials.test.mjs": { "kind": "content", "category": "kit-consistency", "reason": "asserts the --pull rows and the absence of --accept rows, after the sync --accept decision" },
     "hooks/hooks.json": { "kind": "content", "category": "kit-consistency", "reason": "one timeout per hook on every host: check-lua-auth 20 s (was 15 s here, 20 s on Claude Code)" },
     "test/lib/hook-runtime.test.mjs": { "kind": "content", "category": "kit-fix", "reason": "the parity runtime test, now from core; a Cursor warning asks instead of allowing, so the expectation changed from allow to ask" },
     "lib/lua-bin.mjs": { "kind": "extra", "category": "kit-fix", "reason": "the one pattern for a lua-cli invocation under any of its names" },

@@ -71,8 +71,9 @@ describe('permissions template — credentials never ride an allow rule', () => 
   });
 
   test('the sync direction that overwrites local files asks, the guarded one does not', () => {
-    expect(permissions.allow).toContain('Bash(lua sync --accept*)');
-    expect(permissions.ask).toContain('Bash(lua sync --accept --force*)');
+    expect(permissions.allow).toContain('Bash(lua sync --pull*)');
+    expect(permissions.ask).toContain('Bash(lua sync --pull --force*)');
+    expect(Object.values(permissions).flat().some((rule) => rule.includes('--accept'))).toBe(false);
   });
 });
 
