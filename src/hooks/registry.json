@@ -1,0 +1,40 @@
+{
+  "entries": {
+    "check-lua-version": { "module": "check-lua-version", "event": "SessionStart", "timeout": 10 },
+    "detect-project": { "module": "detect-project", "event": "SessionStart", "timeout": 5 },
+    "check-lua-auth": { "module": "check-lua-auth", "event": "SessionStart", "timeout": 20, "timeoutBy": { "codex": 15 } },
+    "inject-context": { "module": "inject-context", "event": "UserPromptSubmit", "timeout": 5 },
+    "confirm-deploy": { "module": "confirm-deploy", "event": "PreToolUse", "timeout": 10, "timeoutBy": { "codex": 30 } },
+    "before-shell-execution": { "module": "before-shell-execution", "event": "PreToolUse", "timeout": 30 },
+    "block-auto-deploy": { "module": "block-auto-deploy", "event": "PreToolUse", "timeout": 5, "if": "Bash(*--auto-deploy*)" },
+    "block-auth-configure": { "module": "block-auth-configure", "event": "PreToolUse", "timeout": 5, "if": "Bash(*auth configure*)" },
+    "block-device-secret": { "module": "block-device-secret", "event": "PreToolUse", "timeout": 5, "if": "Bash(*devices*)" },
+    "approve-web-app-npm": { "module": "approve-web-app", "event": "PreToolUse", "timeout": 5, "if": "Bash(npm --prefix src/apps/*)" },
+    "approve-web-app-new": { "module": "approve-web-app", "event": "PreToolUse", "timeout": 5, "if": "Bash(lua apps new *)" },
+    "approve-web-app": { "module": "approve-web-app", "event": "PreToolUse", "timeout": 5 },
+    "guard-qa-helper": { "module": "guard-qa-helper", "event": "PreToolUse", "timeout": 5, "if": "Bash(*lib/qa/cli.mjs*)" },
+    "warn-version-zero": { "module": "warn-version-zero", "event": "PreToolUse", "timeout": 5, "if": "Bash(*push*--set-version 0.*)" },
+    "post-deploy-smoke": { "module": "post-deploy-smoke", "event": "PostToolUse", "timeout": 60 },
+    "post-compile-summary": { "module": "post-compile-summary", "event": "PostToolUse", "timeout": 10, "if": "Bash(*compile*)" }
+  },
+  "hosts": {
+    "claude-code": {
+      "SessionStart": ["check-lua-version", "detect-project", "check-lua-auth"],
+      "UserPromptSubmit": ["inject-context"],
+      "PreToolUse": [
+        "confirm-deploy", "block-auto-deploy", "block-auth-configure", "block-device-secret",
+        "approve-web-app-npm", "approve-web-app-new", "guard-qa-helper", "warn-version-zero"
+      ],
+      "PostToolUse": ["post-deploy-smoke", "post-compile-summary"]
+    },
+    "codex": {
+      "SessionStart": ["check-lua-version", "detect-project", "check-lua-auth"],
+      "UserPromptSubmit": ["inject-context"],
+      "PreToolUse": [
+        "approve-web-app", "before-shell-execution", "confirm-deploy", "block-auto-deploy",
+        "block-device-secret", "warn-version-zero"
+      ],
+      "PostToolUse": ["post-deploy-smoke", "post-compile-summary"]
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "servers": {
+    "lua-platform": { "transport": "stdio", "command": "node", "entry": "mcp/lua-platform/dist/server.js", "env": ["LUA_API_KEY"] },
+    "lua-docs": { "transport": "http", "url": "https://docs.heylua.ai/mcp" },
+    "ui": { "transport": "http", "url": "https://ui.lua.dev/mcp" }
+  }
+}

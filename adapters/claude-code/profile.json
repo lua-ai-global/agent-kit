@@ -1,0 +1,11 @@
+{
+  "host": "claude-code",
+  "displayName": "Claude Code",
+  "pluginRoot": "${CLAUDE_PLUGIN_ROOT}/",
+  "toolMatcher": "Bash",
+  "hookFilters": true,
+  "hooksJsonStyle": {},
+  "mcpStyle": { "inlinePrimitiveArrays": true },
+  "mcpEnvSpelling": null,
+  "permissionsStyle": "raw-comment"
+}
