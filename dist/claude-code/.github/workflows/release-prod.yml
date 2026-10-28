@@ -1,0 +1,113 @@
+name: release-prod
+
+on:
+  push:
+    branches: [main]
+  # Manual re-run for the case a merge to main fires its push event late or not
+  # at all (2026-09-18: the 1.3.0 squash merge queued nothing for seven minutes).
+  # The existing tag check makes a dispatch on an already-released version a no-op.
+  workflow_dispatch:
+
+# Production release: every merge to `main` cuts a stable release.
+#
+# Versioning: uses package.json version EXACTLY. The developer must bump
+# package.json on the staging→main PR before merging. If the tag already
+# exists (i.e. version wasn't bumped), the workflow fails — explicit, not
+# silent.
+#
+# This is a deliberate gate: production releases require a thoughtful
+# version bump, not auto-numbering. Beta releases auto-version because
+# they're meant to be many; prod releases should be intentional.
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: plugins/lua-agent-builder
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: plugins/lua-agent-builder
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+
+      - name: Install plugin deps
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test plugin
+        run: npm test -- --coverage
+
+      - name: Verify per-file coverage gate
+        run: node scripts/check-coverage.mjs
+
+      - name: Install MCP deps
+        working-directory: plugins/lua-agent-builder/mcp/lua-platform
+        run: npm ci
+
+      - name: Test MCP
+        working-directory: plugins/lua-agent-builder/mcp/lua-platform
+        run: npm test
+
+      - name: Build MCP bundle
+        working-directory: plugins/lua-agent-builder/mcp/lua-platform
+        run: npm run build
+
+      - name: Verify bundle size
+        run: node scripts/check-bundle-size.mjs
+
+      - name: Read version from package.json
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "${VERSION}" == *"-beta"* || "${VERSION}" == *"-rc"* || "${VERSION}" == *"-alpha"* ]]; then
+            echo "::error::Production release requires a stable version in package.json (no -beta/-rc/-alpha suffix). Got: ${VERSION}"
+            exit 1
+          fi
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Production version: ${VERSION}"
+
+      - name: Check if tag already exists
+        id: tag_check
+        working-directory: ${{ github.workspace }}
+        run: |
+          if git rev-parse "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "Tag ${{ steps.version.outputs.tag }} already exists — no version bump in this push, skipping release. (Lints + tests still ran.)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build release tarball
+        if: steps.tag_check.outputs.skip != 'true'
+        # scripts/pack.mjs handles the MCP dist/ inclusion. Production
+        # tags use the package.json version verbatim — no override needed.
+        run: |
+          node scripts/pack.mjs
+          TARBALL="claude-code-lua-plugin-${{ steps.version.outputs.version }}.tar.gz"
+          ls -lh "${TARBALL}"
+          echo "TARBALL=plugins/lua-agent-builder/${TARBALL}" >> "$GITHUB_ENV"
+
+      - name: Create GitHub release
+        if: steps.tag_check.outputs.skip != 'true'
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          prerelease: false
+          generate_release_notes: true
+          target_commitish: main
+          files: ${{ env.TARBALL }}

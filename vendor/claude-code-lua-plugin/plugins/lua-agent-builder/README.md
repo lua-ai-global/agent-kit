@@ -1,0 +1,100 @@
+# lua-agent-builder
+
+A [Claude Code](https://code.claude.com) plugin for building, testing, and deploying [Lua AI agents](https://heylua.ai) from inside your Claude Code session. It wraps the `lua-cli` toolchain (a TypeScript SDK/CLI — unrelated to the Lua programming language) with single-permission slash commands, hook-enforced production gates, a source-verified knowledge base, and two MCP servers.
+
+Verified against **lua-cli 3.33.0** (September 2026): every command shape, SDK type and API endpoint the plugin uses was read from the lua-cli / lua-api source, not from the public docs. 1.3.0 added the per-step model classes (`taskClass`, `class/fast|balanced|strong`, `--apply-effort`, `lua workflows policy models`, `clear-gate`, `recompose`, `lua models list --workflows`) and the workflow autonomy envelope (`lua workflows policy autonomy`, `Consent: auto (policy)`) from lua-cli 3.36.0. 1.4.0 corrects what a workflow run COSTS — a Job-tier step is billed per model reply (a credit per reply on a legacy plan, actions = price band × the model's multiplier with cached tokens at the provider's fraction on a seat plan), a Job step runs on its own `model` and not the agent's, and `raise-budget --credits <n>` raises a cap counted in the run's own unit — and describes the lua-cli 3.37.0 read-outs that show it (`Tokens:`, the `Uncached`/`Cached`/`Output` columns, the `⚙` Job-model line, `finished past the cap`, the budget events in `workflows logs`, the `job-model-default` deploy advisory), read from lua-cli `main` and marked ⏳. The pin is 3.37.0 since 1.4.0; 3.37.0 adds no command and no option, so every shape the plugin emits still runs on 3.36.0.
+
+## Install
+
+```
+/plugin marketplace add lua-ai-global/claude-code-lua-plugin
+/plugin install lua-agent-builder@claude-code-lua-plugin
+/reload-plugins
+/lua-doctor        # Node, npm, lua-cli ≥ 3.38.0, auth, permission rules
+```
+
+New login runs in your own terminal (`lua auth configure`) — the plugin never handles your email, one-time code or credential. `/lua-auth` guides it.
+
+## Layout
+
+```
+plugins/lua-agent-builder/
+├── .claude-plugin/plugin.json   # plugin manifest
+├── .mcp.json                    # lua-platform (local stdio) + lua-docs (https://docs.heylua.ai/mcp) + ui (https://ui.lua.dev/mcp)
+├── commands/                    # 25 slash commands
+├── agents/                      # 11 subagents (architect, skill-builder, debug, deploy-pilot, auditor, qa, qa-cartographer, qa-player, qa-grader, qa-analyst, qa-reporter)
+├── hooks/                       # 12 Node ESM hooks + hooks.json
+├── lib/
+│   ├── knowledge/               # primitives, workflows, cli-reference, integrations, decision-trees, log-drains, devices, web-apps, decisions, browser
+│   │   └── qa/                  # /lua-qa full prompts: rubric, ICP cards, player, red team, graders, analyst, fix-locus, mechanics, qualifying questions
+│   ├── qa/                      # /lua-qa full helpers behind one entry, lib/qa/cli.mjs (recorder, checks, discovery + SVG, report, Workflow script)
+│   ├── permissions-template.json# allow/ask/deny rules /lua-doctor merges into .claude/settings.json
+│   ├── tokenizer.mjs            # production-verb classifier for the deploy gate
+│   └── credentials.mjs, hook-runtime.mjs, lua-cli.mjs, platform.mjs
+├── mcp/lua-platform/            # vendored MCP server (src/, tests/, dist/server.js committed)
+├── scripts/                     # 17 lint scripts + 2 check scripts + pack
+└── test/                        # jest tests for hooks + lib
+```
+
+## Slash commands
+
+| Slash | What it does |
+|---|---|
+| `/lua-doctor` | 5-step environment diagnostic with consent-gated fixes |
+| `/lua-auth` | Keep a working credential or guide a private `lua auth configure` login |
+| `/lua-update` | `npm install -g lua-cli@latest` |
+| `/lua-docs <topic>` | Search the docs via the `lua-docs` MCP (WebFetch fallback) |
+| `/lua-status` | `lua status --json` — auth, project, per-primitive local-vs-deployed sync |
+| `/lua-init` | `lua init --ci` — new agent, existing agent, or duplicate; model from the live catalog |
+| `/lua-architect <goal>` | Plan an agent end-to-end (subagent) |
+| `/lua-new <type> [name]` | Scaffold + register + compile + test a tool, skill, webhook, trigger, job, preprocessor, postprocessor, mcp, device, device-trigger, voice, workflow, workflow-script, web app, decision or ⏳ browser (subagent) |
+| `/lua-test [type]` | `lua test --ci skill\|webhook\|job\|preprocessor\|postprocessor\|workflow\|webapp`; a web-app route that writes (POST/PUT/PATCH/DELETE) runs against live Data only after your one confirmation; failures go to the debug subagent |
+| `/lua-audit [app]` | Read-only access-control and security audit of a web app: every custom access condition in its routes and pages (server, UI only or both) and every finding, from the Read/Grep/Glob-only `lua-auditor` subagent (UI-only gates, client-supplied identity, missing ownership checks, secrets in the page bundle, loose schemas, a widened CSP, XSS, …) with severity, `file:line`, what happens in production and a suggested fix. Never changes code; `/lua-new webapp` offers it when an app is built |
+| `/lua-workflow <verb>` | Offline workflow runs with scripted approvals/signals; list/status/watch; start/approve/signal/resume/cancel with one confirmation |
+| `/lua-chat` | One-shot `lua chat --ci -e <env> -m … -t` on an isolated thread |
+| `/lua-logs` | `lua logs --ci --json` with the real 18-source `--type` list and ⏳ the 3.38.0 read window (`--since` / `--until` / `--environment` / `--follow`) |
+| `/lua-drains` | ⏳ 3.38.0 log drains: `lua drains list\|status\|deliveries\|create\|update\|delete\|test\|verify\|pause\|resume\|rotate-secret`; reads run at once, the seven config verbs confirm once, the signing secret is never stored |
+| `/lua-browser` | ⏳ 3.49.0 the agent's cloud browser from the terminal: `lua browser read <url>` (one page — title, final URL, engine, the wall when one blocks it) and `lua browser run "<task>"` (each step, then status, stopReason, cost, engine, output), plus `lua browsers list\|delete`. ⏳ 3.57.0 `--login <name>` signs a run in with one of your own saved logins (up to 5). A read runs at once; a run and a delete confirm once through the Bash prompt, because a run acts on real websites and spends model budget. Rows: `lua logs --type browser` |
+| `/lua-decisions` | ⏳ 3.48.0 named decisions (`LuaDecision`): `lua decisions list\|versions\|run\|publish\|delete`; `run` takes a message or JSON state and, ⏳ 3.49.2, `--model <id>` for any of the thirteen decision models (Jev, OpenAI, eleven through OpenRouter); list/versions/run go at once, publish (rollback) and delete confirm once |
+| `/lua-devices` | Hardware and local machines: self-describing vs `defineDevice`, ⏳ 3.45.0 `lua devices credential --out` (the secret goes to a git-ignored mode-600 file, never the conversation), Node / Python / Pico W client scaffolds, `push device` / `device-trigger`, `status`, ⏳ 3.45.0 `test --command` / `test-trigger --trigger`, `lua logs --type device\|device-trigger`, troubleshooting — every 3.45-only verb has a 3.44 fallback |
+| `/lua-env` | `lua env <sandbox\|production> --list \| -k KEY -v VALUE \| -k KEY --delete`; the Bash prompt is the confirmation, values never echoed |
+| `/lua-integrations` | `lua integrations available\|list\|info\|webhooks …\|mcp …`; read-only verbs run at once, mutations confirm once, OAuth connects go to your terminal |
+| `/lua-sync` | Drift report from `lua status --json` + `lua sync --check`; `--pull` / `--push` |
+| `/lua-push` | `lua push <type> --ci --force` for every push type incl. trigger/device/voice/workflow/webapp/decision/⏳ browser; never `--auto-deploy` |
+| `/lua-deploy` | Gated ship sequence for any production change — primitive versions, persona, workflow versions, web apps, MCP activation, agent-version promote/rollback (subagent) |
+| `/lua-version` | Agent versions: list/show/diff/status/create; promote routes to `/lua-deploy` |
+| `/lua-template` | Marketplace agent templates: view/versions/status/health/installed/create/draft/install; publish and apply are prefixed production verbs |
+| `/lua-qa [quick\|full]` | **Quick:** conversational QA + offline workflow scenarios + log scan → triage report (subagent), as before. **Full:** a tier (`smoke` 30-min cap from plan approval, grader A only, no stress test; `medium` default 1–2 h, `production-ready` 3–5 h with a release gate) and four gates (discovery diagrams, qualifying answers and metrics inferred from the code unless `--interview`, environment, the plan), then personas × runs sized to the tier (medium: ≥10 × 3; production-ready: ≥12 × 5, 4 must pass), a red team, offline workflow flow tests, direct tool tests and (outside smoke) a stress test run in parallel, graded by two independent Opus graders (one in smoke), clustered by root cause → PDF + HTML + `results.json` report |
+
+## Safety model
+
+- **Production gate** — every verb that changes what runs in production is blocked by the `confirm-deploy` hook (on every Bash call) unless it carries the `LUA_DEPLOY_CONFIRMED=1` prefix, which only the deploy flow emits after your single confirmation: `lua deploy`, `lua skills|webhooks|jobs|preprocessors|postprocessors deploy`, `lua skills production deploy` (non-interactive since lua-cli 3.44.0; gated since 1.7.0), `lua persona production deploy`, `lua workflows deploy|activate`, `lua version promote`, `lua mcp activate`, `lua marketplace template publish|apply` — in every spelling lua-cli accepts (its `publish`/`on`/`enable`/`submit`/`rollout`/`prod` aliases and the `heylua`/`lua-ai` binaries). A hook block wins over any allow rule. The permission template allows the literal prefixed forms and carries no deny/ask rule for the bare verbs, because Claude Code evaluates deny/ask past a leading env assignment and such a rule would block the confirmed form too. `lib/tokenizer.mjs` is the one classifier; `test/lib/permissions-mirror.test.mjs` fails if the layers drift. Since 1.6.0 the classifier reads the whole command — chains, groups, substitutions, `bash -c` strings, env prefixes, `npx`/`pnpm exec`/`node` launchers and binary paths — and honours the prefix only on the simple command that runs the verb.
+- **Headless mode** — `LUA_PLUGIN_HEADLESS=1` (for `claude -p` in the Lua Job tier or CI): no hook message points at a slash command, the `LUA_DEPLOY_CONFIRMED=1` prefix is void (every production verb is blocked) and the post-deploy smoke ping is skipped. See [Running in the Lua Job tier](../../docs/JOB_TIER.md).
+- **`--auto-deploy`** is denied and blocked unconditionally.
+- **Log drains** (⏳ lua-cli 3.38.0) are ORGANIZATION configuration, not a deploy: `lua drains list|status|deliveries|test` are allowed, and `create|update|delete|verify|pause|resume|rotate-secret` sit in the `ask` tier — that prompt is `/lua-drains`'s single confirmation. They are deliberately **not** in `lib/tokenizer.mjs`: none of them changes what runs in production, and `LUA_DEPLOY_CONFIRMED=1` would be the wrong sentence for a log-shipping change. No secret ever reaches a command line — a header value is prompted or read from an environment variable (`--header-from-env NAME=ENV_VAR`), and the HMAC signing secret is minted server-side and printed exactly once.
+- **Decisions** (⏳ lua-cli 3.48.0) are AGENT configuration, not a deploy: `lua decisions list|versions|run` are allowed (`run` is one billed call that changes nothing), and `publish` (makes a version current for every caller) and `delete` sit in the `ask` tier — that prompt is `/lua-decisions`'s single confirmation. `lua push decision` stages only and rides the generic push allow; a staged version goes live through `lua version promote` (gated) or `lua decisions publish` (ask).
+- **The browser** (⏳ lua-cli 3.49.0) is split by what a call does to the outside world, not by what it costs. `lua browser read <url>` and `lua browsers list` are allowed: a read opens one cloud session, prints the page and closes it, and nothing at the other end changes. `lua browser run` sits in the `ask` tier — it clicks, types and can submit (Buy, Pay, Place order, Sign in, Send) on a real third-party website, spends up to `--max-cost` (default 1 USD, at most 10) of model budget, and with `--login` acts as the person on that site; no Lua verb undoes any of it. `lua browsers delete` asks too. `lua push browser` sits in `ask` **above** the generic push allow, for the same reason as `lua push device`: a browser is not versioned, so the push upserts the profile by name and rewrites the live policy (`allowedDomains`, `confirmActions`, `allowScripts`, `maxDownloadMb`) of a browser the agent already lists. None of them is in `lib/tokenizer.mjs` — nothing here changes what runs in production, and `LUA_DEPLOY_CONFIRMED=1` is the wrong sentence for a browser. No password, username or verification code ever reaches the plugin: a browser signs in with a **saved login** the person fills in on a Lua page, and no flag or SDK call takes a secret.
+- **Devices** are not part of agent versions and are not deploy verbs: a pushed `defineDevice` is live on the next turn, so `lua push device` / `device-trigger` sit in the `ask` tier (above the generic push allow rule), as do `lua devices enable|disable|remove|test|test-trigger|credential` and their aliases; `list` / `status` are allowed. A device-trigger is published only by `--auto-deploy`, which stays denied — `/lua-devices` prints that line for your own terminal.
+- **Web apps** (lua-cli 3.42.0+) run their routes as you against the agent's live `Data`, locally too — there is no test database. The plugin runs `GET` routes freely and asks once before any route that writes; it never starts `lua apps dev` (it prints that for your own terminal). Only `lua apps new <name>` and four npm commands run without a prompt — `npm --prefix src/apps/<name>/web install --ignore-scripts [@lua-ai-global/app-client]`, `run typecheck`, `run build` — and only in that exact form: the `approve-web-app` hook matches them with anchored regexes rather than permission globs (a glob's `*` would also match an extra package, a second `--prefix`, or anything after the app name). A web-app push is staged only; `/lua-deploy webapp` promotes a new agent version and stops before promoting if that version would also make other staged primitives live.
+- **Credential isolation** — `lua auth configure|key|logout` are denied for the model; login happens in your terminal. A device credential is only ever issued with `--out <file>` (the `block-device-secret` hook blocks the printing form), into a git-ignored mode-600 file the plugin never reads back.
+- **Single permission per slash** — each slash asks at most one question (`x-lua-multi-step: true` marks the diagnostic exceptions).
+
+## MCP servers
+
+- `lua-platform` (local, `mcp/lua-platform/dist/server.js`, one self-contained bundle — no `node_modules` needed at runtime): five read-only tools — `list_agents`, `get_agent`, `list_primitive_versions`, `get_deployment_status`, `tail_logs` — over the same lua-api routes lua-cli uses, with lua-cli's credential resolution (env → `.env` → renewable session → credentials file).
+- `lua-docs` (remote, `https://docs.heylua.ai/mcp`): the public docs search (`search_lua_cli`, `query_docs_filesystem_lua_cli`).
+- `ui` (remote, `https://ui.lua.dev/mcp`, no auth): the `@lua-ai-global/ui` component catalog, a public Storybook MCP (`list-all-documentation`, `get-documentation`, `get-documentation-for-story`). The skill builder looks a component's props up here before writing web-app pages. The permission template allows the three tools one by one, never the whole server. The key is short on purpose, so every composed tool name stays within 64 characters.
+- Claude Code names a plugin's MCP tools `mcp__plugin_lua-agent-builder_<server>__<tool>`; the subagents, slashes and the permission template use that form (the plain `mcp__lua-platform__…` spelling only exists for a server you register yourself with `claude mcp add`).
+
+## Build & test
+
+```bash
+npm ci && npm run lint && npm run test:coverage          # plugin: 17 lints, hooks 100% / lib ≥ 90% coverage
+cd mcp/lua-platform && npm ci && npm test && npm run build  # MCP server → dist/server.js (committed)
+```
+
+`dist/server.js` must be committed: marketplace installs copy the repo verbatim with no build step.
+
+## CI and release
+
+`ci.yml` runs lint + tests on macOS/Ubuntu/Windows × Node 18/20 and builds the MCP bundle; `release-beta.yml` cuts a prerelease on every push to `staging`; `release-prod.yml` cuts `v<package.json version>` on every push to `main` and refuses an existing tag. Versions in `package.json`, `.claude-plugin/plugin.json`, `../../.claude-plugin/marketplace.json`, `mcp/lua-platform/package.json` and the MCP source must match (`lint-release-version`).

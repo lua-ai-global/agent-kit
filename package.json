@@ -1,0 +1,17 @@
+{
+  "name": "lua-agent-kit",
+  "version": "1.16.0",
+  "private": true,
+  "type": "module",
+  "description": "One source for the Lua Agent Builder plugin on every coding agent",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "emit": "node build/emit.mjs --all",
+    "check:claude": "node build/check-claude.mjs"
+  }
+}

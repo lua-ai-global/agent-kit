@@ -1,0 +1,206 @@
+#!/usr/bin/env node
+// Validates that lua-cli command + subcommand pairs referenced in the
+// knowledge files (lib/knowledge/*.md) actually exist in lua-cli.
+//
+// Iteration-13 audit: integrations.md referenced
+//   - `lua integrations add` (real command is `lua integrations connect`)
+//   - `lua integrations data <connection> <resource>` (no `data` subcommand)
+// Both shipped to the lua-architect agent's prompt context — the architect
+// would have advised users to run commands that don't exist.
+//
+// This lint reads packages/lua-cli/src/cli/command-definitions.ts to learn
+// every top-level command and its valid subcommands, then scans the
+// knowledge files for `lua <command> <subcommand>` pairs and fails on any
+// that aren't recognized.
+//
+// When extracted to the standalone plugin repo (lua-cli not reachable),
+// this lint exits 0 with a warning — the cross-repo CI is responsible for
+// its own version of this check.
+
+import { readFile, readdir } from 'node:fs/promises';
+import { join } from 'node:path';
+
+// Set LUA_CLI_SRC=/path/to/lua-core-services/packages/lua-cli to run this
+// check from the standalone plugin repo against a local checkout.
+const CLI_ROOT = process.env.LUA_CLI_SRC ?? '../../packages/lua-cli';
+const CLI_DEF = `${CLI_ROOT}/src/cli/command-definitions.ts`;
+
+let cliSource;
+try {
+  cliSource = await readFile(CLI_DEF, 'utf8');
+} catch {
+  console.warn(`! Skipping knowledge-commands check: ${CLI_DEF} not reachable.`);
+  process.exit(0);
+}
+
+// Discover top-level commands from `program.command("name [args]")` calls.
+// Subcommands appear inside addHelpText after-blocks describing actions, but
+// for accuracy we ALSO walk `.command("subname")` chains under known parents
+// and allow the architect's references to match either.
+const TOP_LEVEL = new Set();
+for (const m of cliSource.matchAll(/program\s*\.\s*command\s*\(\s*['"]([a-z][a-z-]*)/g)) {
+  TOP_LEVEL.add(m[1]);
+}
+
+// For known multi-action commands, mine the help text for the action list.
+// integrations / webhooks / triggers / persona / etc. all expose "actions"
+// listed in addHelpText. We extract them by looking for help-text blocks
+// that name the action set.
+const SUBCOMMANDS = {};
+function setSub(parent, set) {
+  SUBCOMMANDS[parent] = (SUBCOMMANDS[parent] ?? new Set());
+  for (const s of set) SUBCOMMANDS[parent].add(s);
+}
+
+// Hand-curated from command-definitions.ts / aliases.ts (lua-cli 3.33.0, the
+// `drains` verbs of lua-cli 3.38.0, plus
+// the `workflows` verbs of lua-cli 3.36.0 — `policy`, `clear-gate`,
+// `recompose`, aliases.ts `workflows.action`); the lint won't try to parse free
+// text exhaustively (too brittle). Update when commands gain/lose actions.
+setSub('auth',         ['configure', 'logout', 'key', 'sessions']);
+setSub('chat',         ['clear']);
+setSub('integrations', ['connect', 'update', 'list', 'available', 'info', 'disconnect', 'convert', 'webhooks', 'triggers', 'mcp']);
+// `lua channels` has only `list` for non-interactive use; creation is
+// interactive and has no subcommand name.
+setSub('channels',     ['list']);
+setSub('voice',        ['test', 'list']);
+setSub('version',      ['create', 'list', 'show', 'diff', 'promote', 'status', 'delete']);
+setSub('git',          ['connect', 'disconnect', 'status', 'auth']);
+setSub('source',       ['list', 'rollback']);
+setSub('marketplace',  ['skill', 'template']);
+setSub('models',       ['list', 'set', 'unset']);
+setSub('telemetry',    ['on', 'off', 'status']);
+setSub('governance',   ['add', 'remove']);
+setSub('triggers',     ['list', 'create', 'logs', 'activate', 'deactivate', 'rotate-token', 'delete']);
+setSub('features',     ['list', 'enable', 'disable', 'view', 'configure']);
+setSub('resources',    ['list', 'view', 'delete']);
+setSub('production',   ['overview', 'persona', 'skills', 'env']);
+setSub('mcp',          ['list', 'activate', 'deactivate', 'delete']);
+// lua-cli 3.45.0 adds `credential` (`devices.action`; aliases `credentials`, `key`).
+setSub('devices',      ['list', 'status', 'enable', 'disable', 'remove', 'test', 'test-trigger', 'credential']);
+setSub('jobs',         ['view', 'versions', 'deploy', 'activate', 'deactivate', 'trigger', 'history', 'delete']);
+setSub('webhooks',     ['view', 'versions', 'deploy', 'activate', 'deactivate', 'delete', 'list-events', 'subscribe', 'unsubscribe']);
+// lua-cli 3.38.0 (PRO-1798, log drains) — `src/utils/aliases.ts` `drains.action`.
+// `rotate-secret` keeps its hyphen: it is the route name too.
+setSub('drains',       ['list', 'status', 'deliveries', 'create', 'update', 'delete', 'test', 'verify',
+                        'pause', 'resume', 'rotate-secret']);
+setSub('preprocessors',  ['view', 'versions', 'deploy', 'activate', 'deactivate', 'delete']);
+setSub('postprocessors', ['view', 'versions', 'deploy', 'activate', 'deactivate', 'delete']);
+setSub('skills',       ['sandbox', 'staging', 'production', 'view', 'versions', 'deploy', 'delete']);
+setSub('workflows',    ['list', 'view', 'versions', 'deploy', 'activate', 'deactivate', 'start', 'run', 'runs', 'status',
+                        'watch', 'cancel', 'resume', 'retry-step', 'resolve-step', 'raise-budget', 'approve', 'approval-payload',
+                        'signal', 'replay', 'logs', 'delete', 'delete-run', 'env-overlay', 'export', 'archive-runs',
+                        'workspace', 'jobs', 'job-logs', 'goals', 'schedules',
+                        // lua-cli 3.36.0 (WMC-E7 / WMC-A6): the org's model and autonomy
+                        // policy (`policy models|autonomy get|set`), the `model_policy` gate, and the
+                        // deterministic rewrite of a chat-composed definition.
+                        'policy', 'clear-gate', 'recompose']);
+setSub('test',         ['skill', 'webhook', 'job', 'preprocessor', 'postprocessor', 'workflow',
+                        // lua-cli 3.42.0 (Lua Apps): one route of a web app.
+                        'webapp']);
+// lua-cli 3.49.0 (`src/utils/aliases.ts` `push.type`): `browser` upserts one LuaBrowser profile
+// (alias `browsers`). It is NOT a `lua deploy` type — a browser is not versioned.
+setSub('push',         ['skill', 'agent', 'persona', 'webhook', 'trigger', 'job', 'preprocessor', 'postprocessor', 'mcp',
+                        'device', 'device-trigger', 'voice', 'workflow', 'webapp', 'decision', 'browser', 'backup', 'all']);
+// lua-cli 3.49.0 (BAC-2418): the two terminal verbs of the agent's cloud browser. `lua browsers`
+// (plural) is a different command — `browsers.action` is list | delete.
+setSub('browser',      ['read', 'run']);
+setSub('browsers',     ['list', 'delete']);
+// lua-cli 3.42.0 (Lua Apps): scaffold and run a web app.
+setSub('apps',         ['new', 'dev', 'preview', 'delete', 'upgrade']); // preview: lua-cli 3.51.0, delete: 3.48.0, upgrade: 3.54.0
+setSub('deploy',       ['skill', 'webhook', 'trigger', 'job', 'preprocessor', 'postprocessor', 'webapp', 'persona', 'all']); // webapp: lua-cli 3.49.0
+setSub('env',          ['sandbox', 'staging', 'production']);
+setSub('persona',      ['sandbox', 'staging', 'production']);
+// `lua integrations webhooks <action>` / `lua workflows goals <verb>` (one
+// level deeper) are NOT modelled — the lint only catches single-token
+// misnames at the first level.
+
+// Extract `lua <token1> <token2>` mentions from each .md file. Skip code
+// blocks marked as bash output (rendered text) but include inline code
+// (which is where slash-command authors typically put commands).
+//
+// Iteration-13 audit: the regex previously extracted flag tokens like
+// `--ci` or `-h` as subcommands, producing false positives on `lua chat
+// --ci`. The character class `[a-z]` (no leading hyphen) for the FIRST
+// char of each captured token disambiguates flags from subcommands.
+function extractLuaMentions(content) {
+  const mentions = [];
+  // Token: starts with [a-z], may continue with [a-z0-9-]. Excludes flags.
+  const TOKEN = '([a-z][a-z0-9-]*)';
+  const inlineCode = new RegExp(`\`lua\\s+${TOKEN}(?:\\s+${TOKEN})?[^\`]*\``, 'g');
+  for (const m of content.matchAll(inlineCode)) {
+    mentions.push({ command: m[1], subcommand: m[2] ?? null, raw: m[0] });
+  }
+  const fencedLine = new RegExp(`^\\s*\\$?\\s*lua\\s+${TOKEN}(?:\\s+${TOKEN})?`, 'gm');
+  for (const m of content.matchAll(fencedLine)) {
+    mentions.push({ command: m[1], subcommand: m[2] ?? null, raw: m[0].trim() });
+  }
+  return mentions;
+}
+
+let failed = false;
+const fail = (msg) => { console.error(`✗ ${msg}`); failed = true; };
+
+const RESERVED_TOKENS = new Set([
+  // Tokens that look like subcommands but are actually positional args /
+  // flags. Don't false-flag them.
+  'sandbox', 'production', 'staging', 'dev',
+  'all', 'view', 'set', 'get', 'list', 'create', 'delete', 'update',
+  'enable', 'disable', 'activate', 'deactivate', 'pause', 'resume',
+  'install', 'uninstall', 'publish', 'unpublish', 'unlist',
+  'subscribe', 'unsubscribe', 'trigger', 'history',
+  'overview', 'persona', 'skills', 'env',
+  'on', 'off', 'status', 'remove', 'test',
+  'restore', 'force',
+  'tool', 'skill', 'webhook', 'job', 'agent', 'preprocessor', 'postprocessor', 'mcp', 'backup',
+  'open', 'close',
+  'bash', 'zsh', 'fish',
+]);
+
+// Iteration-13 audit: this lint originally only scanned lib/knowledge/.
+// Stale `lua integrations add stripe` references in agents/lua-architect.md
+// slipped through. Now scans all three user-shipped surfaces.
+const SCAN_DIRS = ['lib/knowledge', 'agents', 'commands'];
+
+// 1.9.0: walks recursively, so `lib/knowledge/qa/*.md` (the /lua-qa full-suite prompts) is checked too.
+async function* walkMd(dir) {
+  let entries = [];
+  try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of entries) {
+    if (e.isDirectory()) yield* walkMd(join(dir, e.name));
+    else if (e.name.endsWith('.md')) yield join(dir, e.name);
+  }
+}
+
+async function* allMd() {
+  for (const dir of SCAN_DIRS) yield* walkMd(dir);
+}
+
+let scanned = 0;
+for await (const path of allMd()) {
+  const content = await readFile(path, 'utf8');
+  for (const m of extractLuaMentions(content)) {
+    if (m.command.startsWith('--')) continue;  // flag, not a command
+    if (!TOP_LEVEL.has(m.command)) {
+      fail(`${path}: references \`lua ${m.command}${m.subcommand ? ' ' + m.subcommand : ''}\` but no top-level \`lua ${m.command}\` command exists in lua-cli.`);
+      continue;
+    }
+    if (m.subcommand && SUBCOMMANDS[m.command]) {
+      if (!SUBCOMMANDS[m.command].has(m.subcommand) && !RESERVED_TOKENS.has(m.subcommand)) {
+        fail(`${path}: references \`lua ${m.command} ${m.subcommand}\` but \`${m.subcommand}\` isn't a known action of \`lua ${m.command}\`. Known: ${[...SUBCOMMANDS[m.command]].join(', ')}.`);
+      }
+    }
+    scanned++;
+  }
+}
+
+// Iteration-13 audit (bug 72 class): fail if zero references were found.
+if (scanned === 0 && !failed) {
+  fail(`Found 0 \`lua …\` references across [${SCAN_DIRS.join(', ')}]. Either the directories are gone, or the inline-code regex is broken. Refusing to silently pass.`);
+}
+
+if (failed) {
+  console.error(`\nFix the references above. Knowledge files feed the lua-architect agent's prompt — wrong commands become wrong user advice.`);
+  process.exit(1);
+}
+console.log(`✓ Knowledge files: ${scanned} \`lua …\` reference(s) check out against command-definitions.ts.`);

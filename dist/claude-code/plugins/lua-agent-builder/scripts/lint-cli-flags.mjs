@@ -1,0 +1,165 @@
+#!/usr/bin/env node
+// Denylist of known-wrong or unsafe lua-cli references that have shipped in
+// the plugin (or that the public docs still show). Standalone-repo friendly:
+// doesn't need lua-cli source (unlike lint-knowledge-commands.mjs, which is
+// skipped without it). Every entry is verified against lua-cli 3.33.0
+// (src/cli/command-definitions.ts, src/utils/aliases.ts, src/api-exports.ts).
+//
+// History:
+//   - `lua sync --accept` was the only server→local flag until 3.10; `--pull`
+//     is canonical since then and `--accept` is kept as an alias. An earlier
+//     version of this lint denied `--pull` — inverted — so the plugin shipped
+//     the legacy spelling for months.
+//   - `lua logs --type mastra` appears in the CLI's own help text but is
+//     rejected by the alias table (exit 2).
+//   - `lua logs --follow` was denied until lua-cli 3.38.0, which added it
+//     (PRO-1838 / A5) alongside `--since`, `--until` and `--environment`.
+//     The entry was removed, not inverted — the same mistake that made the
+//     plugin ship `lua sync --accept` for months.
+//   - `lua deploy workflow|mcp|device|voice` are not deploy types; workflows
+//     go live with `lua workflows deploy`, MCP servers with `lua mcp activate`.
+//   - `defineTool` / `lua-cli/skill` / `welcomeMessage` / `Jobs.schedule` /
+//     `User.update` do not exist in the SDK.
+//
+// Add new entries here whenever a wrong-flag bug ships and gets fixed. Each
+// entry is a literal substring matched against every .md/.json/.mjs file
+// under the user-shipped surfaces.
+
+import { readFile, readdir } from 'node:fs/promises';
+import { join, extname } from 'node:path';
+
+const DENY = [
+  // Pattern → reason
+  { pattern: 'lua sync --accept', reason: '`--accept` is a legacy alias; the canonical server→local flag is `lua sync --pull`' },
+  { pattern: '--type mastra', reason: '`mastra` is not a `lua logs --type` value (rejected, exit 2) — use runtime/agent_error' },
+  { pattern: 'lua deploy workflow', reason: 'workflows go live with `lua workflows deploy <name> -v <ver>`' },
+  { pattern: 'lua deploy mcp', reason: 'MCP servers are not versioned; enable with `lua mcp activate <name>`' },
+  { pattern: 'lua deploy device', reason: 'devices are not a `lua deploy` type and not part of agent versions — a pushed defineDevice is live on the next turn; a device-trigger is published with `lua push device-trigger --name <n> --auto-deploy` in the user\'s own terminal' },
+  { pattern: 'lua device-triggers', reason: 'there is no `lua device-triggers` command (lua-cli 3.45.0) — manage device triggers through `lua push device-trigger` and `lua devices test-trigger`' },
+  { pattern: 'lua deploy voice', reason: 'voices are not a `lua deploy` type — promote an agent version' },
+  { pattern: 'lua skills list', reason: 'the action is `lua skills view`' },
+  { pattern: 'lua webhooks list ', reason: 'the action is `lua webhooks view` (`list-events` is separate)' },
+  { pattern: 'lua jobs list', reason: 'the action is `lua jobs view`' },
+  { pattern: 'lua jobs run ', reason: 'the action is `lua jobs trigger -i <name>`' },
+  { pattern: 'lua chat --json', reason: '`lua chat` has no --json flag' },
+  // `lua logs --follow` WAS denied here: it did not exist before lua-cli 3.38.0.
+  // PRO-1838 (A5) shipped it (a poll, not a stream), together with --since/--until/
+  // --environment, so the entry is gone rather than inverted. What is still wrong is
+  // a SEVERITY flag on `lua logs`: --min-severity is a log-DRAIN selector and `lua
+  // logs` has no severity option at all — severity is filtered client-side on `subType`.
+  { pattern: 'lua logs --min-severity', reason: '`lua logs` has no severity flag; `--min-severity` is a `lua drains` selector — filter on the entry\'s `subType` instead' },
+  // lua-cli 3.38.0 `commands/drains.mutations.ts` `updateDrainCore`: a drain cannot
+  // change kind in place, and the flag is refused before any request is sent.
+  { pattern: 'lua drains update --type', reason: 'a drain cannot change type in place — delete it and create a new one' },
+  { pattern: 'lua dev ', reason: 'there is no `lua dev` command in lua-cli 3.x' },
+  { pattern: 'lua integrations add', reason: 'the action is `lua integrations connect --integration <type>`' },
+  { pattern: 'lua triggers pause', reason: 'integration triggers moved to `lua integrations webhooks pause --webhook-id <id>`' },
+  { pattern: 'lua triggers resume', reason: 'integration triggers moved to `lua integrations webhooks resume --webhook-id <id>`' },
+  // 3.33.0's `lua integrations connect` still prints this as its next step; the
+  // command is a tombstone (prints a redirect, exit 0, creates nothing).
+  { pattern: 'lua triggers create --connection', reason: 'a moved flag — `lua triggers` prints a redirect and creates nothing; subscribe with `lua integrations webhooks create --connection <id> --object <o> --event <e> --hook-url <url>`' },
+  { pattern: 'lua channels add', reason: '`lua channels` has only `list`; channel creation is interactive' },
+  { pattern: "from 'lua-cli/skill'", reason: 'no `./skill` subpath export — import from `lua-cli`' },
+  { pattern: 'defineTool(', reason: '`defineTool` is not exported by lua-cli — use `class X implements LuaTool`' },
+  { pattern: 'welcomeMessage', reason: '`LuaAgentConfig` has no welcomeMessage field' },
+  { pattern: 'Jobs.schedule(', reason: 'the method is `Jobs.create({ schedule: {...} })`' },
+  { pattern: 'User.update(', reason: 'fetch the instance first: `(await User.get(id)).update({...})`' },
+  { pattern: "type: 'cron', pattern", reason: 'JobSchedule uses `expression`, not `pattern`' },
+  { pattern: 'intervalMs', reason: 'JobSchedule interval uses `seconds`' },
+  // lua-cli 3.36.0 (`policy autonomy set`, commands/workflows.ts `buildAutonomyPolicyPatch`):
+  // the envelope's duration flag is `--max-duration <seconds>`; `--max-duration-seconds` belongs to
+  // `raise-budget` and bounds ONE run. `--agent` is registered only so the verb can refuse it — no
+  // route writes a per-agent envelope (the sub-agent PATCH discards `workflows`).
+  { pattern: 'policy autonomy set --max-duration-seconds', reason: 'the envelope flag is `--max-duration <seconds>`; `--max-duration-seconds` is `raise-budget`\'s' },
+  { pattern: 'policy autonomy set --agent', reason: '`--agent` is refused: no route writes a per-agent autonomy envelope — set the organization\'s with `lua workflows policy autonomy set …`' },
+  { pattern: 'lua auth configure --email', reason: 'email and OTP input must stay in a private terminal', authFlow: true },
+  { pattern: 'lua auth configure --api-key', reason: 'credentials must stay out of the model conversation', authFlow: true },
+];
+
+// Scoped entries: spellings that are right elsewhere but wrong inside the /lua-qa full suite
+// (1.9.0). `lua sync --check` is the legitimate read of /lua-sync, and `lua chat -e sandbox -m` is
+// what /lua-chat and quick-mode QA run — but a full-suite player or helper prompt must never shell
+// out to them directly: chats go through the recorder (scrubbed env, sandbox lock, player stamp).
+const QA_SCOPE = (path) => {
+  const p = path.replace(/\\/g, '/');
+  return p.startsWith('lib/knowledge/qa/') || /^agents\/lua-qa-[^/]+\.md$/.test(p);
+};
+const SCOPED_DENY = [
+  { pattern: 'lua sync --check', reason: 'the QA suite reads drift from `lua status --json` via `lib/qa/cli.mjs discover`; it never runs `lua sync`', applies: QA_SCOPE },
+  { pattern: 'lua chat -e sandbox -m', reason: 'QA chats go through lib/qa/cli.mjs record (scrubbed env, lock, recorder)', applies: QA_SCOPE },
+];
+
+// `scripts/` is deliberately NOT scanned: lint scripts quote the wrong
+// spellings they guard against.
+const SCAN_DIRS = ['commands', 'agents', 'hooks', 'lib', 'mcp'];
+const AUTH_DOC_DIRS = ['../../docs'];
+const AUTH_DOC_FILES = ['README.md', 'SECURITY.md', '../../README.md'];
+const SCAN_EXT = new Set(['.md', '.json', '.mjs', '.js', '.ts']);
+
+let failed = false;
+const fail = (msg) => { console.error(`✗ ${msg}`); failed = true; };
+
+async function* walk(dir) {
+  let entries;
+  try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of entries) {
+    if (e.name === 'node_modules' || e.name === 'dist' || e.name === 'coverage' || e.name.startsWith('.')) continue;
+    const path = join(dir, e.name);
+    if (e.isDirectory()) yield* walk(path);
+    else if (SCAN_EXT.has(extname(e.name))) yield path;
+  }
+}
+
+// Lines that explain WHY a spelling is wrong legitimately quote it. They
+// must carry a negation marker so the quote is unambiguous.
+const EXPLANATORY_LINE_RE = /\b(NOT|not|never|no|none|does not|do not|doesn't|don't|isn't|aren't|is not|are not|wrong|invalid|moved|rejected|instead|legacy|retired)\b/;
+
+// A runnable `lua devices credential|credentials|key …` shape: the action followed by at least one
+// flag, up to the end of the inline-code span or the line.
+const DEVICE_CREDENTIAL_SHAPE_RE = /\blua\s+devices\s+(?:credentials?|key)\s+--[^`\n]*/g;
+
+let scanned = 0;
+async function scan(path, { authOnly = false } = {}) {
+  const content = await readFile(path, 'utf8');
+  const lines = content.split('\n');
+  const rules = authOnly ? DENY : [...DENY, ...SCOPED_DENY.filter((r) => r.applies(path))];
+  for (const { pattern, reason, authFlow } of rules) {
+    if (authOnly && !authFlow) continue;
+    lines.forEach((line, i) => {
+      if (!line.includes(pattern)) return;
+      if (!authFlow && EXPLANATORY_LINE_RE.test(line)) return;
+      fail(`${path}:${i + 1}: contains denylisted CLI reference \`${pattern}\` — ${reason}`);
+    });
+  }
+  // lua-cli 3.45.0 `lua devices credential` prints the device secret to stdout — into the
+  // conversation — unless `--out <file>` is given. Every runnable shape the plugin ships must carry
+  // `--out` (hooks/block-device-secret.mjs blocks the other form at run time).
+  if (!authOnly) {
+    lines.forEach((line, i) => {
+      for (const m of line.matchAll(DEVICE_CREDENTIAL_SHAPE_RE)) {
+        if (!/\s--out[\s=]/.test(m[0])) {
+          fail(`${path}:${i + 1}: \`${m[0].trim()}\` has no \`--out <file>\` — without it the device secret is printed into the conversation`);
+        }
+      }
+    });
+  }
+  scanned++;
+}
+
+for (const dir of SCAN_DIRS) {
+  for await (const path of walk(dir)) {
+    // Don't lint this script itself — it has to mention the deny patterns.
+    if (path.endsWith('lint-cli-flags.mjs')) continue;
+    await scan(path);
+  }
+}
+for (const dir of AUTH_DOC_DIRS) {
+  for await (const path of walk(dir)) await scan(path, { authOnly: true });
+}
+for (const path of AUTH_DOC_FILES) await scan(path, { authOnly: true });
+
+if (failed) {
+  console.error('\nFix the references above. These commands are wrong or unsafe in a model-run plugin flow.');
+  process.exit(1);
+}
+console.log(`✓ CLI flag denylist: ${scanned} file(s) scanned, no known-wrong flags found.`);

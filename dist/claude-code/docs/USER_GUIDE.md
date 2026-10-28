@@ -1,0 +1,336 @@
+# Lua Agent Builder — User Guide
+
+A complete walkthrough of the [`lua-agent-builder`](https://github.com/lua-ai-global/claude-code-lua-plugin) Claude Code plugin — what it does, how to install it, the canonical build loops (tools, integrations, workflows, templates), the safety model, and what to do when things go wrong.
+
+The plugin wraps **lua-cli 3.38.0** (the pinned minimum: the 3.33.0 base, the 3.36.0 workflow verbs, the 3.37.0 Job-billing read-outs and the 3.38.0 log drains plus the `lua logs` read window, all marked ⏳ in the knowledge base), the TypeScript SDK/CLI for the Lua agent platform. It has nothing to do with the Lua programming language. Everything in this guide (command shapes, SDK types, API routes) was verified against the lua-cli and lua-api source, not only the public docs.
+
+If you just want to start: [Installation](#installation) → [Your first agent](#your-first-agent).
+
+---
+
+## Table of contents
+
+1. [What this plugin is](#what-this-plugin-is)
+2. [Prerequisites](#prerequisites)
+3. [Installation](#installation)
+4. [Authentication](#authentication)
+5. [Your first agent](#your-first-agent)
+6. [Building a workflow](#building-a-workflow)
+7. [Slash commands reference](#slash-commands-reference)
+8. [Subagents reference](#subagents-reference)
+9. [Knowledge base](#knowledge-base)
+10. [Hooks — what runs automatically](#hooks--what-runs-automatically)
+11. [MCP servers — what Claude can call directly](#mcp-servers--what-claude-can-call-directly)
+12. [Common workflows](#common-workflows)
+13. [Safety model](#safety-model)
+14. [Troubleshooting](#troubleshooting)
+15. [FAQ](#faq)
+
+---
+
+## What this plugin is
+
+`lua-agent-builder` lets you build, test and ship Lua agents by talking to Claude instead of memorising CLI flags:
+
+- **Slash commands** wrap every `lua` command you need (`/lua-init`, `/lua-new`, `/lua-test`, `/lua-workflow`, `/lua-push`, `/lua-deploy`, `/lua-status`, …), collect the inputs up-front in one prompt, and surface errors with the CLI's typed exit codes explained.
+- **Subagents** do the heavy lifting in their own context with restricted tools: the architect plans, the skill-builder scaffolds and tests any primitive (including workflows, triggers, devices and voices), the debug agent diagnoses failures, the deploy pilot runs the gated ship sequence, the QA agent runs conversational and offline-workflow suites.
+- **A knowledge base** (`lib/knowledge/`) gives those agents the exact SDK shapes, workflow builder, CLI matrix, integration patterns, decision trees and log-drain contract — checked against lua-cli source (3.33.0 base; the ⏳ additions against the `main` / `feat/workflow-autonomy` refs lua-cli 3.36.0, 3.37.0 and 3.38.0 are cut from).
+- **Hooks** probe your environment, inject the current agent into Claude's context, and gate every production-affecting verb.
+- **Two MCP servers**: a local read-only platform server (what's deployed, versions, logs) and the public docs MCP.
+
+---
+
+## Prerequisites
+
+| Requirement | Why | How |
+|---|---|---|
+| **Node.js ≥ 18** | hooks and the MCP server are Node ESM | macOS `brew install node@20` · Windows `winget install OpenJS.NodeJS.LTS` · Linux NodeSource / `nvm install 20` |
+| **lua-cli ≥ 3.38.0** | the command shapes and output the plugin reads (3.36.0 added the workflow policy, clear-gate and recompose verbs; 3.37.0 added no verb at all — it prints what a run cost; **3.38.0 adds the whole `lua drains` command and the `lua logs` read window `--since` / `--until` / `--environment` / `--follow`, with all 18 log sources reachable by `--type`**) | `npm install -g lua-cli` (or `/lua-update`) |
+| **Claude Code** | the host | https://claude.com/claude-code |
+| **A Lua account** | to talk to `api.heylua.ai` | https://admin.heylua.ai — `/lua-auth` guides the login |
+
+`/lua-doctor` checks all of these and offers consent-gated fixes. Platforms: macOS 14+, Ubuntu 22.04+, Windows 11; CI runs the suite on all three with Node 18 and 20.
+
+New in 1.16.0: **web-app audit.** `/lua-audit [app]` reads a web app's routes, pages and the files they import, then reports every custom access condition (who may see or do what beyond the sign-in the gateway already requires, and whether it is enforced on the server, only in the UI, or both) and every access-control or security finding — each with severity, `file:line`, what will happen in production and a suggested fix. It never changes code: say "fix 2" to have it changed. `/lua-new webapp` offers it when an app is built, and in a project with web apps Claude offers it after a non-trivial web-app change.
+
+New in 1.15.0: **the cloud browser.** When the work is on a website with no API — a price, stock, a portal, a page that only renders after JavaScript — the agent can drive a real Chrome browser: the person's own desktop browser in a chat, and the Lua cloud browser everywhere else. `/lua-browser read <url>` opens one page and prints it, `/lua-browser run "<task>"` gives the browser a task and shows every step, and `/lua-browser list|delete` manages the agent's named browsers. A read runs at once; a run confirms once through the Bash prompt, because it clicks, types and can submit on a real site and spends model budget up to its `--max-cost`. `/lua-new browser <name>` scaffolds a `LuaBrowser` locked to its own sites (`allowedDomains`) with `confirmActions: ['submit']` on anything that submits, pays or sends, and `/lua-push browser` ships it. A password never reaches the plugin or the agent: a browser signs in with a **saved login** the person fills in on a Lua page, at the access level they choose, and a code or a bot check becomes a private link to them. `lua logs --type browser` is where the browser says which engine ran, which host it refused and which wall stopped it. Needs lua-cli 3.49.0; saved logins 3.57.0; downloads, PDFs, uploads and page scripts 3.58.0.
+
+New in 1.14.0: **web-app pages on the new Lua design.** `lua apps new` now scaffolds pages on `@lua-ai-global/ui` 0.3 (the look Lua Workspace uses) and `@lua-ai-global/app-client` 0.1, which applies the shell's light/dark, density and the person's accent to the page by itself. The builder writes pages with the design's colour tokens only (and no theme code on app-client 0.1), and looks each component up in the new `ui` MCP server (`https://ui.lua.dev/mcp`, the public component catalog) before using it. For an app made earlier it names `lua apps upgrade <name>` for you to run. Needs lua-cli 3.55.0.
+
+New in 1.13.0: **preview a web app before it goes live.** After `/lua-push webapp`, the builder can open the staged version with `lua apps preview`: a Lua Workspace link on its own address, where Data writes go to a throwaway copy, emails and messages are recorded instead of sent, and outside calls are blocked. Anyone who can edit the agent can open it, for 24 hours by default. Needs lua-cli 3.51.0.
+
+New in 1.12.0: **org-shared Data and viewer decisions.** When several agents of one organization need the same dataset, the builder now recommends `Data.shared(name)` (same methods as `Data`; an org admin creates the collection and names its readers and writers through the admin API) and explains its errors, including why every call fails in a local test run. A web app's routes can decide workflow approvals and answer input steps as the signed-in person with `Workflows.viewer`. Needs lua-cli 3.50.0.
+
+New in 1.10.0: **decisions.** A decision is one call that takes some state and typed questions and returns typed answers with probabilities: the odds that something is true, a choice with its confidence, or a score on a scale. `/lua-new decision <name>` writes a `LuaDecision` with literal questions and registers it; `/lua-push decision` stages a version; `/lua-decisions` lists the agent's decisions, shows their versions, runs one on a message or JSON state (on the version's model, or `--model <id>` for any of the thirteen decision models, Jev and OpenAI included), publishes a version (the rollback) or deletes one. Reads and runs go at once; publish and delete confirm once through the Bash prompt. Needs lua-cli 3.48.0; `--model` and the OpenRouter ids need 3.49.2.
+
+New in 1.9.0: **the full QA suite.** `/lua-qa full` runs at a tier: `smoke` (a 30-minute cap from the moment you approve the plan), `medium` (the default, 1 to 2 hours) or `production-ready` (3 to 5 hours, ending in a release gate). It maps the agent into diagrams you confirm and infers the qualifying answers and metrics from the code, citing a `file:line` for each (`--interview` asks you instead). Then it plays customer personas several times each plus a red team, runs offline workflow flow tests, direct tool tests and (outside smoke) a stress test in parallel, grades every run with two independent graders (one in smoke), clusters the failures by root cause and writes a PDF, HTML and JSON report. Bare `/lua-qa` (or `/lua-qa quick`) is the pass from earlier releases, unchanged and with no new question.
+
+New in 1.7.0: **devices.** `/lua-devices` connects a Raspberry Pi, a laptop or a Pico W to the agent. It helps you choose between a self-describing client and a `defineDevice` declaration. With lua-cli 3.45.0 it issues a **device credential** straight into a git-ignored, mode-600 `.env.device` that the conversation never sees (a scoped personal API key is refused by the device gateway). It writes a Node, Python or MicroPython client, pushes, and tests with `lua devices status`, `test --command` and `test-trigger --trigger`. Every 3.45-only step names its lua-cli 3.44 fallback. The same release re-checks the plugin against lua-cli 3.44.0, where `lua push agent` stages the persona and `lua push all` no longer activates workflows, and gates the new non-interactive `lua skills production deploy`.
+
+New in the 1.5.0 knowledge base: **log drains.** A drain copies the organization's agent log records to a destination you own — a receiver of your own, an OTLP collector, Datadog or Better Stack — as they happen, and it is a *copy*: everything it ships stays readable with `lua logs`. `/lua-drains` covers all eleven verbs, the signing secret that is printed once and never stored, and `--header-from-env` for a vendor key. The same release teaches `/lua-logs`, `lua-debug` and `lua-qa` to read a **window** (`--since 15m`, `--until`, `--environment sandbox`, `--follow`) instead of paging backwards and stitching timestamps together.
+
+New in the 1.4.0 knowledge base: **what a workflow run costs.** A Job-tier step is billed per model **reply**, not per attempt — a coding turn that answers two hundred times is charged two hundred times — which is one credit per reply on a legacy plan and, on a seat plan, **actions** (the call's price band × the model's multiplier, with cached prompt tokens counted at the fraction the provider charges). `lua workflows raise-budget <runId> --credits <n>` keeps its flag name on both plans, but `<n>` is a cap in the run's OWN unit — actions on a seat plan — and `/lua-workflow status` names it. A Job step also runs on its own `model`, failing that the platform's Job default, failing that your organization's — never the agent's model — so leaving `model` off a Job step is a cost decision. Those are platform rules, true on any CLI. **lua-cli 3.37.0** is what makes them visible: a `Tokens:` line and `Uncached` / `Cached` / `Output` columns under `--steps` (signals, never charges — do not add them up), `⚙ <step>: model … · ×<multiplier> · chosen by <leg>` on Job rows, `finished past the cap` on a run that crossed its budget and completed anyway, the three budget events in `lua workflows logs`, a `raise-budget` confirmation that names the unit, and a `job-model-default` advisory at `lua workflows deploy`. 3.37.0 adds no command and no option, so nothing the plugin runs breaks on an older CLI — it simply prints less.
+
+Two platform features are new in the 1.3.0 knowledge base: **per-step model classes** (`taskClass`, `model: 'class/fast|balanced|strong'`, `requires`, `effort`, `lua models list --workflows`, `lua workflows policy models`, `lua push workflow --apply-effort`, `clear-gate`, `recompose`) and the **workflow autonomy envelope** (`lua workflows policy autonomy`, the `Consent: auto (policy)` line). They need **lua-cli 3.36.0 or later** — the plugin's pinned minimum since 1.3.0; the knowledge files mark them ⏳ and were read from the lua-cli source on `main` / `feat/workflow-autonomy`, the refs 3.36.0 is cut from, so the slashes tell you when your CLI predates a verb (exit 2) instead of guessing.
+
+---
+
+## Installation
+
+```
+/plugin marketplace add lua-ai-global/claude-code-lua-plugin
+/plugin install lua-agent-builder@claude-code-lua-plugin
+/reload-plugins
+/lua-doctor
+```
+
+If `/lua-doctor` isn't recognised after `/reload-plugins`, start a fresh `claude` session. The doctor runs five steps — Node, package manager, lua-cli version, authentication (`lua models list --json --ci`, a 1–2 s authenticated call), and the permission-rule merge into your project's `.claude/settings.json` (Claude Code ignores a plugin's own `permissions` block, so the plugin asks once to merge `lib/permissions-template.json`; accept it or every safe `lua` call will prompt).
+
+---
+
+## Authentication
+
+lua-cli resolves credentials in this order, and the plugin's MCP server does the same:
+
+1. `LUA_API_KEY` in your environment (a `.env` in the project counts — lua-cli loads it first).
+2. The **renewable session** written by `lua auth configure` with email + one-time code to `~/.lua-cli/sessions/` — the default login since lua-cli 3.29.
+3. `~/.lua-cli/credentials` — a plain API key, written when you pick the API-key option of `lua auth configure`.
+
+`/lua-auth` keeps whatever already works. For a new login it sends you to your own terminal:
+
+```bash
+lua auth configure
+```
+
+Choose the email option; the CLI handles the code, then you pick an organization, the exact agents and a role. Nothing about the login passes through the Claude conversation, and the plugin denies `lua auth configure`, `lua auth key` and `lua auth logout` for the model. `lua auth sessions` lists signed-in devices; `lua auth logout --all` signs out everywhere.
+
+---
+
+## Your first agent
+
+```bash
+mkdir -p ~/agents/weather-news && cd ~/agents/weather-news && claude
+```
+
+**1. Plan** — `/lua-architect I want an assistant that fetches the weather for my city and reads the morning headlines`. The architect reads the knowledge base and returns a plan: persona, model (from the live catalog — the platform default is `alibaba/qwen3.8-flash`), a `weather` skill with two tools, custom HTTP for the APIs, build order, and a next-step menu.
+
+**2. Scaffold** — `/lua-init`. It probes auth (auto-running `/lua-auth` if needed), lists your orgs, fetches the model catalog with `lua models list --json`, and runs `lua init --ci --agent-name … --org-id … [--model …] [--with-examples] --force`. You get `src/index.ts` (the `LuaAgent`), the CLI-managed `lua.skill.yaml`, and with examples the canonical `examples/` folder including workflow samples. A typed personal key cannot create agents (exit 10) — the slash offers the "bind to an existing agent" path instead.
+
+**3. First tool** — `/lua-new tool get_weather`. The skill-builder subagent writes `src/skills/tools/GetWeatherTool.ts` (a class `implements LuaTool` with a Zod `inputSchema`), creates or picks the skill, **registers it in `src/index.ts`** (unregistered primitives are never compiled), runs `lua compile --ci`, then `lua test --ci skill --name get_weather --input '{"city":"London"}'` (for `skill` tests `--name` is the **tool** name and `--input` is the tool's own fields).
+
+**4. Secrets** — in your terminal: `lua env sandbox -k WEATHER_API_KEY -v <key>` (writes `.env`) and `lua env production -k WEATHER_API_KEY -v <key>`. The tool reads `env('WEATHER_API_KEY')`.
+
+**5. Test** — `/lua-test` picks the type (`skill`, `webhook`, `job`, `preprocessor`, `postprocessor`, `workflow`) and name from `dist-v2/manifest.json`. A failure is handed to the debug subagent automatically.
+
+**6. Chat** — `/lua-chat` → sandbox (which pushes your local skills to the sandbox first), your message, a fresh thread (`lua chat --ci -e sandbox -m … -t`). ⚠ lua-cli 3.33.0 uploads the **whole environment of the shell Claude Code runs in** with those sandbox skill versions, and the runtime never reads it — start Claude Code from a clean shell (`env -i …`) when your shell holds secrets; see the plugin's SECURITY.md.
+
+**7. QA** — `/lua-qa` (or `/lua-qa <tool or workflow>`) runs the quick pass, as in earlier releases. `/lua-qa full` runs the complete suite.
+
+- **Quick** is the pass from earlier releases: 8–15 conversations on an isolated thread each, offline scenarios for every workflow, a log scan for `subType === 'error'`, and a triage report with a fix path per finding. Its sandbox chats are plain `lua chat -e sandbox`, so the shell-environment warning under step 6 applies.
+- **Full** is the complete suite, at one of three **tiers**:
+  - **`/lua-qa full smoke`**: a light check with a hard cap of 30 minutes, counted from when you approve the plan. No new conversation starts after minute 25, and none continues past minute 30; grading the last runs and writing the report take a few minutes more. It runs 4 to 5 personas on the top jobs and 1 red-team card, once each. It adds tool tests, a happy-path flow test per workflow and a log scan. One grader grades each run, and there is no stress test. The verdict is `Smoke: no blockers found` or `Smoke: blockers found`. A smoke result is never a release decision.
+  - **`/lua-qa full`** (or `full medium`): about 1 to 2 hours. It runs at least 10 personas and 3 red-team cards, 3 times each, and all 3 runs must pass. It adds the full tool and flow tests, a burst stress test, the log scan and both graders.
+  - **`/lua-qa full production-ready`**: about 3 to 5 hours. It runs at least 12 personas, 5 times each, and 4 of the 5 runs must pass. It runs at least 4 red-team cards covering every attack class your tools expose, and every workflow branch. The stress test is concurrent on a staged version when one exists. The tier ends in a release gate: every card meets the bar, there are no safety vetoes or confirmed unbacked claims, and every metric is met. The verdict is `Production ready: YES` or `Production ready: NO, <n> blockers`.
+
+  The helpers enforce the tier. A plan that is too small, too large or over its time budget is refused. The report shows the tier as a badge on the cover and has a "Scope of this test" table: what ran, what did not, and the time taken against the budget. It also says how much to trust the result. Metrics the tier does not measure show as "not in this tier". When a smoke or medium run passes, the report recommends running the next tier before release.
+
+  The suite has four gates, and nothing touches the agent before the third:
+  1. **Discovery.** It compiles the agent and reads `lua status`, `lua version list` and the workflows. Then it draws a flow diagram, a decision tree per skill and a branch tree per workflow (SVG, plus a text outline in the conversation). You confirm the map.
+  2. **Qualifying answers.** By default you are not asked anything. The planner infers who the users are, the top jobs, what must never happen and how sensitive the data is from the code, the persona, the skills and the tools, and cites a `file:line` for each answer. You see them as a short list of assumptions, and the report lists them as inferred. Add `--interview` (`/lua-qa full medium --interview`) to be asked instead.
+  3. **Metrics and environment.** The default metrics apply, and the environment defaults to sandbox: it runs your local code, and chats run one at a time. A production-ready run uses a staged version (a test session, so side effects are recorded, not sent) when one exists and your code is not ahead. Inference never picks production and never agrees a company email domain (the helper refuses one when the answers were inferred). You are asked only when the environment is genuinely unclear. Production runs only when you ask for it, with `--interview` or in your own words, and always after a second, explicit consent question (the exact option `I consent to running this against production`) and a Claude Code permission prompt for the stamp itself.
+  4. **The plan.** Persona cards and a red-team set sized to the tier, offline workflow flow tests (`lua test workflow` with scripted approve/deny/signal), direct tool tests (a tool that throws fails even if `lua test` exits 0) and, outside smoke, a stress test (p50/p90/p99 on a staged version, burst in sandbox). You see it with its time estimate against the tier's budget, then approve it.
+
+  It then runs everything in parallel through the Workflow tool, which loads a copy of its script from the run folder because the tool only accepts scripts inside your project. If the Workflow tool is missing, it runs parallel subagents instead. If the plugin's agent types cannot be resolved, each role runs as a general-purpose agent that first reads its own instructions. Sonnet plays the personas and Opus the red team. Each run gets a fresh thread and a contamination check, and Opus grader A, then grader B only if A passed, grade it; safety is a veto. Failures are clustered by root cause and each gets a fix locus, including **moving logic out of the prompt** into a workflow step, an approval gate, a validation schema or a code guard.
+
+  The report lands in `.lua-qa/runs/<runId>/report/`: `results.json` and `report.html` always, and `report.pdf` when pandoc and WeasyPrint are installed (the slash offers the install line and asks first). Safety is enforced in code, not only in the prompt: the helpers run `lua` with a scrubbed environment (never your shell's secrets, never `LUA_API_KEY`) and a coded argument allowlist, test data must use `@example.com`, and secrets are redacted in every file they write. A hook lets only the plugin's own helper script run under its permission rule, and the approved plan is sealed by a hash, so edited plan files are refused.
+
+**8. Ship** — `/lua-deploy`: pick what goes live (`skill`, `webhook`, `trigger`, `job`, `preprocessor`, `postprocessor`, `persona`, `workflow`, `mcp`, `device`, `device-trigger`, `voice`, `agent-version`, `all`), the name and version, confirm once. The deploy pilot then runs: `git status` clean → `lua compile --ci` → `lua status --json` (abort if the server is ahead) → `lua push … --ci --force` → the prefixed production verb (`LUA_DEPLOY_CONFIRMED=1 lua deploy …`, `… lua workflows deploy <n> -v latest`, `… lua mcp activate <n>`, or `lua version create` + `… lua version promote N`) → a log scan and `get_deployment_status`. It reports the rollback command. On an agent that has agent versions, skills ship as `lua version create` + `promote` rather than `lua deploy skill`: that verb goes live at once but leaves the active version's snapshot stale, and the next promote (a rollback included) would silently revert it; webhooks, jobs, processors, triggers and workflows get a server-side scoped promote and are fine either way. The persona is live the moment `lua push agent` (or `lua push all`) runs — there is no staged persona; `lua deploy persona <n>` is its rollback.
+
+---
+
+## Building a workflow
+
+Workflows are durable multi-step graphs with approvals, signals, fan-out, retries, budgets, schedules and Job-tier code. The knowledge file `lib/knowledge/workflows.md` is the reference; the loop is:
+
+1. `/lua-new workflow reply-approval` — the builder writes `src/workflows/reply-approval.ts` (`createWorkflow({...}).then(step).agentStep(...).approval(...).commit()`), registers it in `LuaAgent.workflows`, compiles, and runs an offline scenario.
+2. `/lua-workflow run reply-approval --input @in.json --approve reviewDrafts` — the local driver (no platform call) with scripted approvals, denials, signals and `--step-output` values for each predicate branch.
+3. `/lua-push workflow` — a server version (not live). Missing `env.template()` keys are refused at push.
+4. `/lua-deploy` → target `workflow` — `LUA_DEPLOY_CONFIRMED=1 lua workflows deploy reply-approval -v latest`, plus `activate` if it has a schedule.
+5. `/lua-workflow start reply-approval --input @in.json` (one confirmation) → `/lua-workflow status <runId>` → `/lua-workflow approve <runId> <wfa_…>` / `signal` / `resume` / `cancel`.
+6. ⏳ **A model per step** (lua-cli 3.36.0 or later): give each `agentStep` a `taskClass` (`classify extract transform draft research reason code judge`) and `model: 'class/fast' | 'class/balanced' | 'class/strong'` — the platform resolves the class through your organization's policy (`/lua-workflow policy models get`; an admin sets `maxClass`, `classMap`, `allow`, `pins`, `fallback`, `consent-actions`), `requires: ['structured']` when the step has an `outputSchema`, and an `effort` that is recorded but only applied once you push with `--apply-effort`. `/lua-workflow models` shows the catalog as a step sees it (class, best for, speed, cost). A step whose class cannot be served parks instead of failing — `/lua-workflow clear-gate <runId>` once the policy is fixed.
+7. ⏳ **Will it start without asking?** A run the agent composes or starts from chat above 15 steps · 20 credits · 1 h parks `gated` until someone consents from the desktop (`status` exits 6 under `--strict`). An organization can pre-consent to a bounded envelope — `/lua-workflow policy autonomy get` shows it; an admin sets it with `lua workflows policy autonomy set --enabled on --max-credits <n> --max-steps <n> --max-duration <seconds> --max-actions <n> --max-runs-per-hour <n> --forms graph,static` (the plugin asks before that org-wide write). Such a start shows `Consent: auto (policy) — ≤ …` on `status`. Goal runs and batch starts always ask; a refusal (`askAboveThresholds: false`) is never turned into an auto-start.
+8. **What did it cost?** `/lua-workflow status <runId>` — the `Budget:` line gives the figure, the unit your organization counts in (credits, or **actions** on a seat plan) and one sentence saying what that unit buys. A Job step is charged per model **reply**, so budget from replies; pin `model` on every Job step (it otherwise runs on the platform or organization default and bills every reply at that model's multiplier). Parked on the budget? `/lua-workflow raise-budget <runId> <n>` — `<n>` is in the run's own unit even though the flag is spelled `--credits`. ⏳ On lua-cli 3.37.0 or later `status` adds a `Tokens:` line and per-step token columns (signals, not charges — never add them up), an `⚙` line naming the Job model and its multiplier, and `lua workflows logs` finally shows the budget park / raise / exceeded events.
+
+Chat-composed workflows can't be deployed from the CLI (`WORKFLOW_DYNAMIC`); `/lua-workflow export <name>` brings one into source, and ⏳ `/lua-workflow recompose <name>` rewrites its task classes into `class/<c>` as a new version.
+
+---
+
+## Slash commands reference
+
+25 slash commands; each asks at most one question (`x-lua-multi-step: true` marks `/lua-doctor`, `/lua-auth`, `/lua-init`).
+
+| Slash | Wraps | Notes |
+|---|---|---|
+| `/lua-doctor` | node/npm/lua probes, permission merge | 5 steps, consent per fix |
+| `/lua-auth` | `lua models list --json --ci` probe, then `lua agents --json --ci` listing | login in your terminal |
+| `/lua-update` | `npm install -g lua-cli@latest` | |
+| `/lua-docs <topic>` | `lua-docs` MCP, WebFetch fallback | knowledge files first |
+| `/lua-status` | `lua status --json --ci` | auth, project, per-primitive sync diffs, orphans, hints |
+| `/lua-init` | `lua init --ci …` | new / existing / duplicate agent; model from `lua models list --json` |
+| `/lua-architect <goal>` | subagent | plan + next-step menu |
+| `/lua-new <type> [name]` | subagent → `lua compile`, `lua test` | 16 primitive types (incl. `workflow-script`, `webapp`, `decision` and ⏳ `browser`) |
+| `/lua-test [type]` | `lua test --ci <type> --name … --input …` | failures → debug subagent |
+| `/lua-audit [app]` | the `lua-auditor` subagent (Read, Grep, Glob only) — no `lua` command | read-only web-app access-control and security audit; offered by `/lua-new webapp` and after non-trivial web-app changes |
+| `/lua-workflow <verb>` | `lua workflows …`, `lua test workflow` | read-only verbs run at once (⏳ incl. `policy models\|autonomy get`, `models`); start/approve/signal/resume/cancel (⏳ `clear-gate`, `policy … set`, `recompose`) confirm once; deploy → `/lua-deploy` |
+| `/lua-chat` | `lua chat --ci -e … -m … -t` | always an explicit thread |
+| `/lua-logs` | `lua logs --ci --type … --json` | the real 18-source `--type` list (`mastra` is not valid); ⏳ 3.38.0 `--since` / `--until` (ISO instant or `15m`/`2h`/`7d`, resolved by the server's clock), `--environment production\|sandbox`, `--follow` (polls ~2 s, refuses `--page`) |
+| `/lua-drains` | `lua drains list\|status\|deliveries\|create\|update\|delete\|test\|verify\|pause\|resume\|rotate-secret` | ⏳ 3.38.0. Reads run at once; the seven configuration verbs confirm once through the Bash prompt. Needs `logs:manage` (a sensitive scope). The signing secret is printed once by the platform and never stored by the plugin; header values are prompted or read from an environment variable with `--header-from-env NAME=ENV_VAR`, never typed on a command line |
+| `/lua-browser` | `lua browser read\|run`, `lua browsers list\|delete`, `lua logs --type browser` | ⏳ 3.49.0. `read` opens one page (title, final URL, engine, the sign-in or bot wall when one blocks it); `run` prints each step, then status, stopReason, steps, cost, engine and output, and `--start-url` / `--schema` / `--max-steps` (1–60) / `--max-cost` (0.01–10 USD) / ⏳ 3.57.0 `--login <name>` (up to 5 of your own saved logins). A read and `list` run at once; `run`, `delete` and `lua push browser` confirm once through the Bash prompt. `-e` only tags the log rows, and `--json` exits 0 even on failure, so the plugin reads `error`/`code`, never the exit code |
+| `/lua-decisions` | `lua decisions list\|versions\|run\|publish\|delete`, `lua logs --type decisions` | ⏳ 3.48.0. `run` takes `--message` or `--state` and, ⏳ 3.49.2, `--provider` / `--model <id>` (any decision model, including the eleven served through OpenRouter) / `--min-confidence`; list/versions/run go at once, publish and delete confirm once through the Bash prompt; a new decision is `/lua-new decision`, a push is `/lua-push decision` |
+| `/lua-devices` | `lua devices list\|status\|credential\|test\|test-trigger\|enable\|disable\|remove`, `lua push device\|device-trigger`, `lua logs --type device\|device-trigger` | guided `setup` (credential → client → push → test); the credential always goes to a git-ignored file via `--out`; reads run at once, everything else confirms once through the Bash prompt; ⏳ 3.45.0 verbs have 3.44 fallbacks |
+| `/lua-env` | `lua env <sandbox\|production> --list \| -k KEY -v VALUE \| -k KEY --delete` | environment + key + value collected once; the Bash prompt is the confirmation; the value is never echoed, listings show masked values |
+| `/lua-integrations` | `lua integrations available\|list\|info\|webhooks …\|mcp …` | read-only verbs run at once; disconnect/convert/webhooks/mcp mutations confirm once via the Bash prompt; `connect`/`update` (browser OAuth) are printed for your terminal |
+| `/lua-sync` | `lua status --json`, `lua sync --check`, `--pull`, `--push` | `--push` sends agent config only |
+| `/lua-push` | `lua push <type> --ci --force …` | every `push.type` (incl. `decision` and ⏳ `browser`, which is upserted in place and so confirms once); stage-all with `all` |
+| `/lua-deploy` | subagent → prefixed production verb | every live path incl. rollback |
+| `/lua-version` | `lua version list/show/diff/status/create` | promote → `/lua-deploy` |
+| `/lua-template` | `lua marketplace template …` | publish/apply are prefixed |
+| `/lua-qa [quick\|full [smoke\|medium\|production-ready] [--interview]]` | quick: subagent; full: `node lib/qa/cli.mjs …` helpers + Workflow tool | quick: triage report; full: four gates (answers inferred unless `--interview`), then PDF + HTML + `results.json` with the tier's verdict |
+
+---
+
+## Subagents reference
+
+| Subagent | Used by | Tools |
+|---|---|---|
+| `lua-architect` | `/lua-architect` | Read, Glob, Grep, Bash (read-only lua verbs), WebFetch, platform MCP (list/get agent, deployment status), docs MCP |
+| `lua-skill-builder` | `/lua-new` | Read, Write, Edit, Glob, Grep, Bash (`lua compile`, `lua test`, `lua sync --check`, `lua voice list`), WebFetch, docs MCP |
+| `lua-auditor` | `/lua-audit`, the audit offer in `/lua-new webapp` | Read, Grep, Glob — nothing else, so an audit can never change code or run a command |
+| `lua-debug` | `/lua-test` failures | Read, Edit, Grep, Glob, Bash (compile/test/status/logs, git log/diff), WebFetch, docs MCP |
+| `lua-deploy-pilot` | `/lua-deploy` | Read, Bash (compile, status, push, the prefixed production verbs, logs, git), platform MCP (deployment status, versions) |
+| `lua-qa` | `/lua-qa` (quick; the mechanics role in full) | Read, Write, Grep, Glob, Bash (chat, status, logs, offline workflow tests, the QA helpers), platform MCP (get agent, tail logs, deployment status) |
+| `lua-qa-cartographer` | `/lua-qa full` (gates 1 and 4) | Read, Grep, Glob, Write, Bash (the QA helpers), platform MCP (get agent, primitive versions) |
+| `lua-qa-player` | `/lua-qa full` | Read, Write, Bash (the QA helpers: one persona run through the recorder) |
+| `lua-qa-grader` | `/lua-qa full` | Read, Grep, Glob, Write, Bash (the QA helpers) |
+| `lua-qa-analyst` | `/lua-qa full` | Read, Grep, Glob, Write |
+| `lua-qa-reporter` | `/lua-qa full` | Read, Write, Bash (the QA helpers: aggregate, cleanup plan, report) |
+
+Subagents never ask questions; the slash that spawned them already collected the user's authorisation.
+
+---
+
+## Knowledge base
+
+`plugins/lua-agent-builder/lib/knowledge/`:
+
+- `primitives.md` — every SDK primitive (`LuaAgent`, `LuaSkill`/`LuaTool`, `LuaWebhook`, `defineTrigger`, `LuaJob`, processors, `LuaMCPServer`, `defineDevice`/`defineDeviceTrigger`, `defineVoice`) and runtime API (`User`, `Data`, `Products/Baskets/Orders`, `Jobs`, `Workflows`, `AI`, `Agents`, `Integrations`, `Voice`, `Channels`, `Team`, `Templates`, `CDN`, `Lua`, `env`) with exact shapes and the gotcha list
+- `workflows.md` — the builder, every step kind, approvals/signals, Job tier and workspaces, script form, the runtime API, all CLI verbs and exit codes, the offline test recipe, the error table
+- `cli-reference.md` — global flags, exit codes, credential resolution, project layout, the full command matrix, the push/deploy matrix, agent versions, marketplace templates, the docs URL map
+- `integrations.md` — Unified.to connectors, auto-provisioned MCPs, `Integrations.passthrough`, event subscriptions vs platform triggers, channels
+- `decision-trees.md` — task → primitive routing, job vs workflow, webhook vs trigger, data placement, build order
+- `devices.md` — 1.7.0: self-describing vs `defineDevice`, device credentials (⏳ 3.45.0 `lua devices credential --out`, why a scoped key is refused), every `lua devices` action on 3.44 vs 3.45 with fallbacks, going live (devices are not part of agent versions), `defineDeviceTrigger` handlers, the Node / Python / MicroPython clients, limits, troubleshooting
+- `log-drains.md` — ⏳ 3.38.0: what a drain is, the eleven verbs, the six states, the selectors, the ownership-verification handshake (only `http` echoes a token), the http/otlp/datadog/betterstack presets, delivery guarantees and the `Retry-After` contract, the quota ladder, the scrubber and its `[redacted:<rule>]` markers, and `logs:read` vs the sensitive `logs:manage`
+
+---
+
+## Hooks — what runs automatically
+
+| Event | Hook | What it does |
+|---|---|---|
+| SessionStart | `check-lua-version` | warns (never blocks) if lua-cli < 3.38.0, pointing at `/lua-update` / `npm i -g lua-cli@latest` |
+| SessionStart | `detect-project` | "✓ Lua agent project detected: <agentId>" from `lua.skill.yaml` |
+| SessionStart | `check-lua-auth` | probes `lua models list --json --ci` (1–2 s); exit 9 → recommends `/lua-auth`, exit 11 → API-unreachable note, timeout → "could not confirm" |
+| UserPromptSubmit | `inject-context` | `[lua] agent: <id> / org: <id>` every prompt |
+| PreToolUse(Bash) | `confirm-deploy` | runs on every Bash call; blocks every production-affecting verb without the `LUA_DEPLOY_CONFIRMED=1` prefix (see Safety model), including lua-cli's alias spellings (`publish`, `on`, `enable`, `submit`, `rollout`, `prod`…) and the `heylua` / `lua-ai` binaries; refuses wrappers and pipes |
+| PreToolUse(Bash) | `block-auto-deploy` | blocks any `--auto-deploy` |
+| PreToolUse(Bash) | `block-auth-configure` | blocks a model-run `lua auth configure` |
+| PreToolUse(Bash) | `block-device-secret` | blocks `lua devices credential` (and its `credentials` / `key` aliases) without `--out <file>`, which would print the device secret into the conversation |
+| PreToolUse(Bash) | `guard-qa-helper` | lets `node …/lib/qa/cli.mjs` run only when the script's real path is this plugin's own `/lua-qa` helper; blocks any other file of that name, relative paths, node flags or `NODE_OPTIONS` before the script, command substitution and unexpanded variables |
+| PreToolUse(Bash) | `warn-version-zero` | warns on `lua push --set-version 0.x.y` that `deploy --set-version latest` picks the most recently *created* version, not the highest semver |
+| PostToolUse(Bash) | `post-deploy-smoke` | after any verb that makes something live (`lua deploy`, `* deploy`, `persona production deploy`, `workflows deploy`, `version promote`, `mcp activate`): pings production on an isolated thread, scans `lua logs --json` for `subType === 'error'` |
+| PostToolUse(Bash) | `post-compile-summary` | "✓ Compiled N primitive(s)" from `dist-v2/manifest.json` |
+
+---
+
+## MCP servers — what Claude can call directly
+
+**`lua-platform`** (local, read-only; `mcp/lua-platform/dist/server.js`):
+
+| Tool | Returns | Backend |
+|---|---|---|
+| `list_agents` | `[{ id, name, orgId, orgName, visibility }]` | `lua agents --json --ci` |
+| `get_agent` | one agent | same, filtered |
+| `list_primitive_versions` | `{ versions: [{ version, versionId, active, createdAt }] }` for a skill, webhook, job, trigger, preprocessor, postprocessor, workflow or the persona | `GET /developer/<plural>/:agentId(/:id/versions)`, `GET /developer/agents/:agentId/persona/versions` |
+| `get_deployment_status` | the active version of every primitive of all seven families plus the persona | composed from the above |
+| `tail_logs` | `{ logs, pagination }` filtered by `logSource` + `primitiveName` (≤ 100) | `GET /developer/agents/:agentId/logs` |
+
+It resolves credentials exactly like lua-cli (env → `.env` → renewable session → credentials file) and refreshes a session token itself. `LUA_API_URL` switches environments.
+
+**Tool names.** Claude Code exposes a plugin's MCP servers under a plugin-scoped name, so inside this plugin the tools are `mcp__plugin_lua-agent-builder_lua-platform__<tool>` and `mcp__plugin_lua-agent-builder_lua-docs__<tool>` (verified with `claude -p --plugin-dir`). The permission template pre-approves the read-only platform server and the two docs search tools under those names; `submit_feedback` still prompts. The plain `mcp__lua-platform__…` / `mcp__lua-docs__…` spellings only exist if you registered a server yourself with `claude mcp add`.
+
+**`lua-docs`** (remote, `https://docs.heylua.ai/mcp`): `search_lua_cli`, `query_docs_filesystem_lua_cli` (`tree /`, `rg`, `head /cli/workflows-command.mdx`), `submit_feedback`.
+
+---
+
+## Common workflows
+
+- **"Build me an agent"** — `/lua-architect <goal>` → say "go" → `/lua-init` → `/lua-new …` per primitive → `/lua-test` → `/lua-qa` (or `/lua-qa full` for the complete suite) → `/lua-deploy`.
+- **"Add a tool to an existing agent"** — `cd` into the project, `/lua-new tool <name>`.
+- **"Connect Linear / HubSpot / GitHub"** — `/lua-integrations info <type>` for the auth methods and scopes, then in your terminal `lua integrations connect --integration <type> --auth-method oauth --scopes all [--triggers ev1,ev2]` (a browser round-trip the plugin never runs); afterwards `/lua-integrations mcp list` / `webhooks list` confirm the MCP and subscriptions, and the agent has the integration's MCP, raw calls via `Integrations.passthrough`, and event subscriptions via `/lua-integrations webhooks create …`. Custom tools only for derived logic.
+- **"Set an API key / secret"** — `/lua-env production set BILLING_API_KEY` (or `sandbox` to write `.env` for `lua test`); read it with `env('BILLING_API_KEY')` in your code. The value goes into the command only — never into the conversation.
+- **"What's deployed?"** — `/lua-status` in the project, or ask Claude (it calls `get_deployment_status`).
+- **"Roll back"** — `/lua-deploy` with the previous version, or target `agent-version` to promote an earlier snapshot.
+- **"Package it for other orgs"** — `/lua-template create`, `/lua-template draft`, edit the `template:` section in `lua.skill.yaml`, `/lua-template publish <id>`.
+- **"Run a workflow on a schedule"** — set `schedule` + `scheduleInput` on `createWorkflow`, deploy, then `/lua-deploy` target `workflow` with the note "activate".
+
+---
+
+## Safety model
+
+The rules `/lua-doctor` merges (`lib/permissions-template.json`):
+
+- **deny** — anything with `--auto-deploy`, `lua auth configure|key|logout*`, and the alternative binaries `heylua *` / `lua-ai *` wholesale (same program; the plugin only ever emits `lua`). The bare production verbs (`lua deploy`, `lua version promote`, …) are **deliberately not in `deny` or `ask`**: Claude Code evaluates those two tiers past a leading env assignment, so a `Bash(lua deploy*)` deny would also block the confirmed `LUA_DEPLOY_CONFIRMED=1 lua deploy …` form and no deploy could ever run (this is documented at code.claude.com/docs/en/permissions and was confirmed live). The bare forms are blocked by the `confirm-deploy` hook instead — see below.
+- **allow** — the prefixed production verbs (`LUA_DEPLOY_CONFIRMED=1 lua deploy*`, `… lua skills|webhooks|jobs|preprocessors|postprocessors deploy*`, `… lua workflows deploy|activate*`, `… lua version promote*`, `… lua persona production deploy*`, `… lua mcp activate*`, `… lua marketplace template publish|apply*`), every read-only `lua` verb the slashes and subagents use, `lua push * --ci --force*`, `lua sync --check|--pull|--push`, `lua version create*` (a snapshot; nothing goes live until `promote`), and read-only git.
+- **ask** — the `/lua-qa full` production consent stamp (`node …/lib/qa/cli.mjs gate … --production-consent-text …`, which otherwise rides the helper's allow rule), deletes, log-drain configuration (`lua drains create|update|delete|verify|pause|resume|rotate-secret`; the read verbs `list|status|deliveries|test` are allowed instead, and none of the eleven is a production verb — a drain ships logs, it does not change what runs), `lua env *`, `lua pull`, `lua chat clear`, `lua source rollback`, `lua version delete`, workflow run control (`start`, `cancel`, `approve`, `signal`, `resume`, `retry-step`, `resolve-step`, `raise-budget`, `deactivate`, `schedules`, `goals`, `export`, `archive-runs`, ⏳ `clear-gate`, `recompose`), ⏳ the org-wide policy writes `lua workflows policy models|autonomy set` (`policy … get` is allowed), `lua devices enable|disable|remove|test|test-trigger|credential` and their aliases, `lua push device|device-trigger` (a pushed device is live on the next turn, so this asks although other pushes are allowed), `lua logs export`, `lua drains confirm|replay`, `lua marketplace skill publish|unpublish|unlist|transfer`, integration connects/changes, `npm install -g lua-cli`, system installs. For the workflow run-control verbs this prompt **is** the single confirmation: `/lua-workflow` shows you the exact command in the permission prompt and does not ask a second time. `/lua-env` (`lua env *` — kept in `ask` even for `--list`, because the CLI prints masked values) and `/lua-integrations` (connect/update/disconnect/convert, webhook create/pause/resume/delete, MCP activate/deactivate) rely on the same prompt.
+
+Precedence is deny → ask → allow. **The production gate is the `confirm-deploy` hook**: it runs on every Bash call, classifies the command with `lib/tokenizer.mjs` (every canonical spelling, every lua-cli alias — `publish`, `on`, `enable`, `submit`, `rollout`, `prod` … — and all three binaries), and blocks a bare production verb with exit 2. A hook block takes precedence over any allow rule, including a broad `Bash(lua *)` you may have in your own settings, so the gate holds even without the template. It refuses shell wrappers and pipes even with the prefix. Only the deploy pilot and `/lua-template` emit the prefix, and only after your one confirmation; the template's allow rules let that confirmed command run without a second prompt. A test (`test/lib/permissions-mirror.test.mjs`) and a lint fail if a deny/ask rule would ever shadow a confirmed form or an allow rule admit a bare one.
+
+---
+
+## Troubleshooting
+
+- **"Marketplace file not found"** — `/plugin marketplace remove claude-code-lua-plugin` then add again; or delete `~/.claude/plugins/marketplaces/lua-ai-global-claude-code-lua-plugin/`.
+- **MCP tools fail with "command not found"** — `mcp/lua-platform/dist/server.js` is missing from the install; it is committed in the repo — reinstall or report.
+- **`MCP_AUTH_STALE`** — no credential resolved, or your session was signed out (signing out of the dashboard/app ends CLI sessions too). Run `lua auth configure` in a terminal. `LUA_API_URL` must match the environment your session was created for.
+- **Permission prompts on every `lua` command** — re-run `/lua-doctor` and accept Step 5.
+- **Hooks aren't firing** — start a fresh `claude` session; `claude --debug` shows every hook's stdin/stdout/exit code.
+- **`lua … --ci` exits 1 with "Interactive prompt required"** — a required flag is missing; the slashes pass complete flags, so report the command.
+- **Exit 9 / 10 / 11 / 12** — not authenticated / the credential's agent-or-role scope excludes this action / the Lua API is unreachable / the model provider refused (key, model, quota).
+- **`/lua-deploy` aborts on "server is ahead"** — someone pushed a newer version; `/lua-sync` pull, review, retry.
+- **Compile: "No skills found" or a primitive is missing from the manifest** — it isn't referenced from the `LuaAgent` arrays in `src/index.ts`.
+- **Workflow push refused** — `unplaced_step`, `tool_unbundled`, `env-template-missing`, `WORKFLOW_NAME_TAKEN`; ⏳ `task-class-without-model`, `model-class-unknown` (and the other vocabulary codes), `model-class-resolution-off`; the debug subagent maps each to a fix (`lib/knowledge/workflows.md` §9).
+- **A workflow run sits `gated` / exit 6** — a consent gate is a person's to clear from the desktop or the approvals inbox (`lua workflows approve` needs a `wfa_` id and cannot); ⏳ on lua-cli 3.36.0 or later `status --strict` exits 6 on it (below 3.36.0 it exits 0). A `model_policy` park (⏳) is cleared with `/lua-workflow clear-gate <runId>` once the org's model policy serves the class.
+- **A budget figure or a raise in the wrong unit** — a seat organization counts **actions**, a legacy one **credits**; read the unit off `/lua-workflow status <runId>` and pass `--credits <n>` with `<n>` in THAT unit (the flag name never changes). Below lua-cli 3.37.0 the raise confirmation always says "credits" whatever the plan — ignore the word, check `status`.
+- **`lua push all` made a workflow live** — ⏳ lua-cli 3.36.0 or newer pushes and activates workflows in stage-all (`lib/knowledge/cli-reference.md` §4); push per type, or use `/lua-deploy` for workflows, when that is not what you want.
+
+---
+
+## FAQ
+
+**Can I use the plugin without a Lua account?** No — every platform call needs a credential. Sign up at https://admin.heylua.ai.
+
+**Do I need to install the plugin per project?** No; hooks only inject context when a `lua.skill.yaml` is present.
+
+**Can Claude build an agent without me typing slashes?** Mostly: after a plan, "go" drives `/lua-init`, `/lua-new`, `/lua-test` via the Skill tool. Production changes always stop at `/lua-deploy`'s confirmation.
+
+**Does `/lua-chat` touch my real conversations?** No — every chat the plugin sends uses an explicit `-t` thread (a lint enforces it), and so does the post-deploy smoke ping.
+
+**Can the plugin deploy without my permission?** No. The `confirm-deploy` hook blocks every bare production verb (in every spelling lua-cli accepts), wrappers and pipes on every Bash call — a hook block wins over any allow rule, so this holds whether or not you merged the permission template. The only form that runs is the `LUA_DEPLOY_CONFIRMED=1`-prefixed command, and the deploy flow emits it only after your confirmation.
+
+**Where does my code go?** From lua-cli to `api.heylua.ai` (and `webhook.heylua.ai`, `cdn.heylua.ai`). The MCP server talks to `api.heylua.ai` and, for a session login, to Google's token endpoint to refresh the session. Claude Code sends the conversation to Anthropic per its own policy.
+
+**How do I update the plugin?** `/plugin marketplace update claude-code-lua-plugin` then reinstall; 1.5.0 targets lua-cli 3.38.0 (the pin; 3.36.0 carries the per-step model classes and workflow autonomy verbs, 3.37.0 the Job-billing read-outs the plugin describes).
+
+**Why does my run show no `Tokens:` line or `⚙` model line?** Those print only when the server projected the figures — an unmetered run, a run metered before the platform shipped them, or a CLI below 3.37.0. A missing line means "nobody reported", not a fault; and the token figures are never what you were charged (the `Budget:` line is), so never sum them.
+
+**Where do I report bugs?** Plugin: https://github.com/lua-ai-global/claude-code-lua-plugin/issues · Security: security@heylua.ai · lua-cli: https://github.com/lua-ai-global/lua-cli/issues · Docs: https://docs.heylua.ai (and `mcp__plugin_lua-agent-builder_lua-docs__submit_feedback` for a wrong page).
