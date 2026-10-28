@@ -8,12 +8,13 @@
     "node": ">=18.0.0"
   },
   "workspaces": [
-    "packages/core"
+    "packages/core",
+    "packages/installer"
   ],
   "scripts": {
     "emit": "node build/emit.mjs --all",
     "check:claude": "node build/check-claude.mjs",
-    "lint": "eslint --ext .mjs build tools/derive-glossary.mjs adapters packages/core/lib/host.mjs packages/core/lib/host-runtime.mjs packages/core/lib/host-default.mjs packages/core/test/host",
+    "lint": "eslint --ext .mjs build tools/derive-glossary.mjs adapters packages/installer packages/core/lib/host.mjs packages/core/lib/host-runtime.mjs packages/core/lib/host-default.mjs packages/core/test/host",
     "test:core": "npm --workspace packages/core run test:coverage"
   },
   "devDependencies": {

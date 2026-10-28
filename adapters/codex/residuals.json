@@ -51,7 +51,7 @@
     "test/lib/tokenizer.test.mjs": { "kind": "content", "category": "tests-superset", "reason": "canonical suite includes classifyProductionCommand" },
     "test/lib/lua-cli-spawn.test.mjs": { "kind": "content", "category": "tests-superset", "reason": "canonical suite (comment and variable-name drift only)" },
 
-    "lib/hook-runtime.mjs": { "kind": "content", "category": "host-runtime", "reason": "multi-host runtime; the parity runtime's own test (test/lib/hook-runtime.test.mjs) passes unchanged against it" },
+    "lib/hook-runtime.mjs": { "kind": "content", "category": "host-runtime", "reason": "multi-host runtime; the parity runtime's own test (test/lib/hook-runtime.test.mjs) passes unchanged against it; isMainScript compares real paths, so a symlinked plugin path no longer disarms every hook" },
     "lib/host.mjs": { "kind": "extra", "category": "host-runtime", "reason": "resolveHost() and the claude-code, codex and cursor protocols" },
     "lib/host-default.mjs": { "kind": "extra", "category": "host-runtime", "reason": "the emitted default host (codex) when no host signal is present" },
     "test/lib/host.test.mjs": { "kind": "extra", "category": "host-runtime", "reason": "unit tests for lib/host.mjs" },

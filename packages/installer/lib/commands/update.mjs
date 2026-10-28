@@ -1,0 +1,69 @@
+import { basename, dirname } from 'node:path';
+import { currentVersion, hubVersions, materialise, prune, setCurrent } from '../hub.mjs';
+import { attachPayload, makeContext, readState, writeState } from '../context.mjs';
+import { nativeFor } from '../native.mjs';
+import { applyNative, planNative } from '../native-ops.mjs';
+import { loadPayload, skillNames } from '../payload.mjs';
+import { applySkill, planSkills } from '../plan.mjs';
+
+function targetVersion(opts, ctx, payload) {
+  const wanted = opts.to ?? payload.version;
+  if (wanted === payload.version) return { version: wanted, materialise: true };
+  if (hubVersions(ctx.hub.root).includes(wanted)) return { version: wanted, materialise: false };
+  return { error: `version ${wanted} is neither this package's payload (${payload.version}) nor kept in ${ctx.hub.root} (${hubVersions(ctx.hub.root).join(', ') || 'none'})` };
+}
+
+function refreshCopies(state, ctx, filter) {
+  const skills = new Set(skillNames(ctx.hub.version(ctx.targetVersion)));
+  const updated = [];
+  for (const entry of state.entries.filter((e) => e.kind === 'copy' && filter(e) && skills.has(basename(e.path)))) {
+    const [action] = planSkills([{ agent: entry.agent, dir: dirname(entry.path) }], [basename(entry.path)], ctx, state);
+    if (action.op !== 'rewrite') continue;
+    Object.assign(entry, applySkill(action, { ...ctx, scope: entry.scope, copy: true }));
+    updated.push(entry.path);
+  }
+  return updated;
+}
+
+function switchVersion(ctx, payload, target) {
+  const previous = currentVersion(ctx.hub);
+  if (target.materialise) materialise(ctx.hub, payload);
+  else attachPayload(ctx, { ...payload, dir: ctx.hub.version(target.version) });
+  ctx.targetVersion = target.version;
+  setCurrent(ctx.hub, target.version, { symlinks: ctx.symlinks });
+  return previous;
+}
+
+function repointNatives(state, ctx, filter, io) {
+  for (const entry of state.entries.filter((e) => e.kind === 'native' && filter(e))) {
+    const plan = planNative({ agent: entry.agent, native: nativeFor(entry.agent) }, ctx, state, ctx.targetVersion);
+    const { entry: next, lines } = applyNative(plan, ctx, entry.install);
+    for (const line of lines) io.out(`  ${line}`);
+    if (next) Object.assign(entry, next);
+  }
+}
+
+export async function update(opts, io) {
+  const payload = loadPayload();
+  const ctx = attachPayload(makeContext(opts, io.env), payload);
+  const state = readState(ctx.hub);
+  if (!state.entries.length) {
+    io.out('Nothing is installed; run `agent-kit install` first.');
+    return 0;
+  }
+  const target = targetVersion(opts, ctx, payload);
+  if (target.error) {
+    io.err(target.error);
+    return 1;
+  }
+  const previous = switchVersion(ctx, payload, target);
+  io.out(`current: ${previous ?? 'none'} -> ${target.version}`);
+  const filter = (e) => !opts.agents.length || opts.agents.includes(e.agent);
+  for (const path of refreshCopies(state, ctx, filter)) io.out(`  rewrote copy ${path} (copy mode rewrites files in place)`);
+  repointNatives(state, ctx, filter, io);
+  writeState(ctx.hub, { ...state, version: target.version, previous });
+  const pruned = prune(ctx.hub);
+  if (pruned.length) io.out(`  pruned hub versions: ${pruned.join(', ')}`);
+  io.out(`Links follow ${ctx.hub.current}; roll back with \`agent-kit update --to ${previous ?? target.version}\`.`);
+  return 0;
+}

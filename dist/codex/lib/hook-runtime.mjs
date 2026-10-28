@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { isHeadless } from './headless.mjs';
@@ -48,10 +49,18 @@ export function emitContext(hookEventName, additionalContext) {
   write(render(resolveHost(process.env, null, DEFAULT_HOST), { warn: additionalContext }, { eventName: hookEventName }));
 }
 
+function canonical(path) {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
 export function isMainScript(importMetaUrl) {
   if (!process.argv[1]) return false;
   try {
-    return resolve(fileURLToPath(importMetaUrl)) === resolve(process.argv[1]);
+    return canonical(fileURLToPath(importMetaUrl)) === canonical(resolve(process.argv[1]));
   } catch {
     return false;
   }

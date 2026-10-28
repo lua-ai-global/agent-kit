@@ -1,0 +1,17 @@
+{
+  "rules": [
+    { "pattern": "\\$\\{CLAUDE_PLUGIN_ROOT\\}/lib/knowledge/([a-z-]+)\\.md", "replace": "../lua-agent-builder/references/$1.md" },
+    { "pattern": "\\$\\{CLAUDE_PLUGIN_ROOT\\}/agents/([a-z-]+)\\.md", "replace": "../lua-agent-builder/references/agents/$1.md" },
+    { "pattern": "\\$\\{CLAUDE_PLUGIN_ROOT\\}/", "replace": "" },
+    { "pattern": "[Uu]se the \\*\\*Skill tool\\*\\* with `skill: \"([a-z-]+)\"`", "replace": "follow the `$1` skill" },
+    { "pattern": "via the \\*\\*Skill tool\\*\\*", "replace": "by following that skill" },
+    { "pattern": "\\*\\*Skill tool\\*\\*", "replace": "skill" },
+    { "pattern": "Skill tool", "replace": "skill" },
+    { "pattern": "[Uu]se the \\*\\*Agent tool\\*\\* with `subagent_type: \"([a-z-]+)\"`", "replace": "follow the brief in `../lua-agent-builder/references/agents/$1.md` yourself" },
+    { "pattern": "`subagent_type: \"([a-z-]+)\"`", "replace": "`../lua-agent-builder/references/agents/$1.md`" },
+    { "pattern": "\\*\\*Agent tool\\*\\*", "replace": "agent brief" },
+    { "pattern": "AskUserQuestion", "replace": "ask the user" },
+    { "pattern": "Claude Code", "replace": "your coding agent" }
+  ],
+  "files": {}
+}

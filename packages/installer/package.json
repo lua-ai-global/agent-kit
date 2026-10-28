@@ -1,0 +1,26 @@
+{
+  "name": "@lua-ai-global/agent-kit",
+  "version": "1.16.0",
+  "description": "Install the Lua Agent Builder into Claude Code, Codex, Cursor and every agent that reads .agents/skills",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "agent-kit": "bin/agent-kit.mjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "payload"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build:payload": "node scripts/build-payload.mjs",
+    "prepack": "node scripts/build-payload.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@clack/prompts": "1.8.1"
+  }
+}

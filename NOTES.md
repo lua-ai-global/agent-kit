@@ -48,6 +48,19 @@ Filed, not fixed (fixing them changes shipped bytes, so they wait for a release)
 8. Permission rows on one host only, tagged in `src/permissions/rules.json`: Codex allows `lua sync --accept*` and asks for `lua sync --accept --force*`; Claude has neither, although lua-cli 3.58.0 keeps `--accept` as the alias of `--pull`. The two QA-helper rows are Claude-only on purpose.
 9. `lint-knowledge-commands` against the local `lua-core-services` checkout (lua-cli 3.44.0) fails on `lua browser`, `lua browsers` and `lua decisions`: the checkout is older than the knowledge base. The same happens on the upstream repo; it needs a current lua-cli checkout, not a kit change.
 10. Codex agents lose the Claude `tools:` allowlist: TOML has no field for it. The doctor should say so.
+11. Claude `lib/hook-runtime.mjs` `isMainScript()` compares `resolve()` paths, but Node resolves the main module through symlinks. When the plugin path crosses a symlink (a symlinked HOME, `/var` on macOS, a marketplace registered through a symlinked directory), every hook silently does nothing, and the deploy gate is off. The installer's doctor self-test caught this: a marketplace registered at `~/.lua/agent-kit/current/claude-code` let a bare `lua deploy all` through. The installer now registers the real version path. The Codex and Cursor runtime (`packages/core/lib/host-runtime.mjs`) compares real paths and has a process test for it. The Claude copy still needs the same fix in a release.
+
+## Installer
+
+- `packages/installer` is `@lua-ai-global/agent-kit` (`bin: agent-kit`). It is packed with `npm pack`, never published.
+- Hub: `~/.lua/agent-kit/<version>/` (or `$XDG_DATA_HOME/lua/agent-kit`), `current` is a relative symlink to the version, `installed.json` records every path written. Skill links point at `current/skills/<name>`, so `update` and rollback switch all of them with one rename.
+- Plugins go through the hosts' own CLIs at the real version path: `claude plugin marketplace add` plus `claude plugin install`, `codex plugin marketplace add` plus `codex plugin add`. A marketplace of the same name from anywhere else is reported and left alone. Update and rollback remove and re-add the marketplace at the new version path.
+- npm drops `.gitignore` and `.npmrc` from a package, so the payload stores them as `<name>.agent-kit-dotfile` and the hub restores them; the hub trees are byte-identical to `dist/`.
+- Detection reads the config directory and looks for the binary on PATH without running it: running `grok --version` creates `~/.grok`.
+- `doctor` never reads a credential value. It reports which sources exist (`env`, a `.env` file, a session file, the credentials file) by presence only.
+- Universal skills (`dist/universal`, mirrored to the repo's `skills/`) are the Tier C build: spec frontmatter, a Tier C notice at the top of every skill, Claude-only vocabulary rewritten by `src/glossary/universal.json`, knowledge and agent briefs under `lua-agent-builder/references/`. `lua-qa` is left out (the QA harness is Claude-only).
+- Known overlap: Codex reads `~/.agents/skills`, so a Codex user with the plugin also sees the universal skills. They are print-only, so the overlap is safe but duplicated.
+- Not done: detecting network or FAT mounts for the copy fallback; Windows was not run (the copy path is exercised with `LUA_AGENT_KIT_NO_SYMLINKS=1`).
 
 ## Deferred
 
