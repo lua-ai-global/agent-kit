@@ -88,7 +88,7 @@ const cursor = {
   block: (reason) => ({ stdout: line({ permission: 'deny', user_message: reason, agent_message: reason }), code: 0 }),
   allow: (reason) => ({ stdout: line({ permission: 'allow', user_message: reason }), code: 0 }),
   ask: (reason) => ({ stdout: line({ permission: 'ask', user_message: reason, agent_message: reason }), code: 0 }),
-  context: (_eventName, message) => ({ stdout: line({ permission: 'allow', user_message: message }), code: 0 }),
+  context: (_eventName, message) => ({ stdout: line({ permission: 'ask', user_message: message, agent_message: message }), code: 0 }),
 };
 
 const PROTOCOLS = { 'claude-code': claudeCode, codex, cursor };

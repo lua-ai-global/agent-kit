@@ -447,13 +447,13 @@ describe('runHook — Cursor JSON output protocol', () => {
     expect(exitSpy).toHaveBeenCalledWith(0);  // 0, not 2 — Cursor uses JSON
   });
 
-  test('warn decision under Cursor emits {permission: allow, user_message} JSON on stdout', async () => {
+  test('warn decision under Cursor asks instead of approving', async () => {
     fakeStdin(JSON.stringify({ command: 'lua compile', cwd: '/tmp' }));
     await expect(runHook('test-hook', () => ({ warn: 'heads up' }))).rejects.toThrow('exit');
-    const written = stdoutSpy.mock.calls.find(c => typeof c[0] === 'string' && c[0].includes('"permission":"allow"'));
+    const written = stdoutSpy.mock.calls.find(c => typeof c[0] === 'string' && c[0].includes('"permission"'));
     expect(written).toBeDefined();
     const json = JSON.parse(written[0]);
-    expect(json.permission).toBe('allow');
+    expect(json.permission).toBe('ask');
     expect(json.user_message).toBe('heads up');
   });
 });

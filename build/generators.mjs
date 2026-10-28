@@ -40,10 +40,10 @@ export function renderPermissionsTemplate(root, host) {
   return `${body.replace(marker, comment)}\n`;
 }
 
-function hookHandler(entry, profile, host) {
+function hookHandler(entry, profile) {
   const handler = { type: 'command', command: `node ${profile.pluginRoot}hooks/${entry.module}.mjs` };
   if (profile.hookFilters && entry.if) handler.if = entry.if;
-  handler.timeout = entry.timeoutBy?.[host] ?? entry.timeout;
+  handler.timeout = entry.timeout;
   return handler;
 }
 
@@ -55,7 +55,7 @@ export function renderHooksJson(root, profile) {
   const hooks = {};
   for (const [event, ids] of Object.entries(plan)) {
     const group = TOOL_EVENTS.has(event) ? { matcher: profile.toolMatcher } : {};
-    group.hooks = ids.map((id) => hookHandler(registry.entries[id], profile, profile.host));
+    group.hooks = ids.map((id) => hookHandler(registry.entries[id], profile));
     hooks[event] = [group];
   }
   return formatJson({ hooks }, profile.hooksJsonStyle);
@@ -83,7 +83,7 @@ export function hostDefault(root, host) {
 }
 
 function cursorHandler(entry, failClosed) {
-  const handler = { command: `node "{{PLUGIN_ROOT}}/hooks/${entry.module}.mjs"`, timeout: entry.timeoutBy?.cursor ?? Math.max(entry.timeout, 10) };
+  const handler = { command: `node "{{PLUGIN_ROOT}}/hooks/${entry.module}.mjs"`, timeout: entry.timeout };
   if (failClosed.includes(entry.module)) handler.failClosed = true;
   return handler;
 }

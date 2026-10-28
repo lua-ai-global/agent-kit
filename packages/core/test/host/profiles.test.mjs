@@ -52,7 +52,7 @@ const EXPECTATIONS = {
   cursor: {
     block: (o) => { expect(o.code).toBe(0); expect(parsed(o)).toMatchObject({ permission: 'deny' }); expect(parsed(o).agent_message).toMatch(/\S/); },
     allow: (o) => { expect(parsed(o)).toMatchObject({ permission: 'allow' }); },
-    warn: (o) => { expect(parsed(o)).toMatchObject({ permission: 'allow' }); expect(parsed(o).user_message).toMatch(/\S/); },
+    warn: (o) => { expect(parsed(o)).toMatchObject({ permission: 'ask' }); expect(parsed(o).user_message).toMatch(/\S/); },
   },
 };
 

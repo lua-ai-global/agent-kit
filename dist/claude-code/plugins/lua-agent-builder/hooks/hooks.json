@@ -39,7 +39,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/confirm-deploy.mjs",
-            "timeout": 10
+            "timeout": 30
           },
           {
             "type": "command",

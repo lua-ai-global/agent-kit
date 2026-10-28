@@ -134,7 +134,14 @@ describe('render', () => {
   test('warn without an event falls back to stderr except on Cursor', () => {
     expect(render('claude-code', { warn: 'w' })).toEqual({ stderr: '⚠ w\n', code: 0 });
     expect(render('codex', { warn: 'w' })).toEqual({ stderr: '⚠ w\n', code: 0 });
-    expect(JSON.parse(render('cursor', { warn: 'w' }).stdout)).toEqual({ permission: 'allow', user_message: 'w' });
+    expect(JSON.parse(render('cursor', { warn: 'w' }).stdout)).toEqual({ permission: 'ask', user_message: 'w', agent_message: 'w' });
+  });
+
+  test('a warning never approves on any host', () => {
+    for (const host of HOSTS) {
+      const out = render(host, { warn: 'w' }, { eventName: 'PreToolUse', hookName: 'h' });
+      expect(out.stdout ?? '').not.toMatch(/"permission(Decision)?":"allow"/);
+    }
   });
 
   test('warn on an event with no context envelope falls back to stderr', () => {

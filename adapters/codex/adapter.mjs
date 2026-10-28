@@ -28,6 +28,7 @@ export const mounts = [
   { from: 'packages/core/test/lib', to: 'test/lib', exclude: ['hook-runtime.test.mjs'] },
   { from: 'packages/core/test/helpers', to: 'test/helpers' },
   { from: 'packages/core/test/host/host.test.mjs', to: 'test/lib/host.test.mjs' },
+  { from: 'packages/core/test/host/host-runtime.test.mjs', to: 'test/lib/hook-runtime.test.mjs' },
   { from: 'packages/mcp-lua-platform', to: MCP, exclude: ['node_modules', 'coverage', 'api-client.mjs', 'server.js', 'api-client.test.mjs'] },
 ];
 

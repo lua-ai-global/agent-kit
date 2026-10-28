@@ -2,9 +2,9 @@
   "entries": {
     "check-lua-version": { "module": "check-lua-version", "event": "SessionStart", "timeout": 10 },
     "detect-project": { "module": "detect-project", "event": "SessionStart", "timeout": 5 },
-    "check-lua-auth": { "module": "check-lua-auth", "event": "SessionStart", "timeout": 20, "timeoutBy": { "codex": 15 } },
+    "check-lua-auth": { "module": "check-lua-auth", "event": "SessionStart", "timeout": 20 },
     "inject-context": { "module": "inject-context", "event": "UserPromptSubmit", "timeout": 5 },
-    "confirm-deploy": { "module": "confirm-deploy", "event": "PreToolUse", "timeout": 10, "timeoutBy": { "codex": 30 } },
+    "confirm-deploy": { "module": "confirm-deploy", "event": "PreToolUse", "timeout": 30 },
     "before-shell-execution": { "module": "before-shell-execution", "event": "PreToolUse", "timeout": 30 },
     "block-auto-deploy": { "module": "block-auto-deploy", "event": "PreToolUse", "timeout": 5, "if": "Bash(*--auto-deploy*)" },
     "block-auth-configure": { "module": "block-auth-configure", "event": "PreToolUse", "timeout": 5, "if": "Bash(*auth configure*)" },
