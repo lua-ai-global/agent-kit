@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
@@ -53,8 +53,39 @@ export function runHostCommand(native, args, env) {
   return { args, status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? (r.error?.message ?? '') };
 }
 
-export function existingMarketplace(native, env) {
-  const r = runHostCommand(native, native.listMarketplaces, env);
+export function runHostCommandAsync(native, args, env) {
+  return new Promise((resolveRun) => {
+    let stdout = '';
+    let stderr = '';
+    let child;
+    try {
+      child = spawn(binFor(native, env), args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (err) {
+      resolveRun({ args, status: null, stdout: '', stderr: err.message });
+      return;
+    }
+    const timer = setTimeout(() => child.kill('SIGTERM'), 120_000);
+    child.stdout.on('data', (d) => { stdout += d; });
+    child.stderr.on('data', (d) => { stderr += d; });
+    child.on('error', (err) => { stderr += err.message; });
+    child.on('close', (status) => {
+      clearTimeout(timer);
+      resolveRun({ args, status, stdout, stderr });
+    });
+  });
+}
+
+export async function runAllAsync(native, commands, env, { stopOnError = true } = {}) {
+  const results = [];
+  for (const args of commands) {
+    const r = await runHostCommandAsync(native, args, env);
+    results.push(r);
+    if (r.status !== 0 && stopOnError) break;
+  }
+  return results;
+}
+
+function parseMarketplaces(native, r) {
   if (r.status !== 0) return { ok: false, error: r.stderr.trim() || `exit ${r.status}` };
   try {
     const found = native.marketplacesOf(JSON.parse(r.stdout)).find((m) => m.name === native.marketplace);
@@ -62,6 +93,14 @@ export function existingMarketplace(native, env) {
   } catch (err) {
     return { ok: false, error: `could not parse marketplace list: ${err.message}` };
   }
+}
+
+export async function existingMarketplaceAsync(native, env) {
+  return parseMarketplaces(native, await runHostCommandAsync(native, native.listMarketplaces, env));
+}
+
+export function existingMarketplace(native, env) {
+  return parseMarketplaces(native, runHostCommand(native, native.listMarketplaces, env));
 }
 
 function real(path) {

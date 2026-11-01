@@ -1,4 +1,4 @@
-import { existingMarketplace, fromHub, ownsMarketplace, runAll, sourceFor } from './native.mjs';
+import { existingMarketplace, existingMarketplaceAsync, fromHub, ownsMarketplace, runAll, runAllAsync, sourceFor } from './native.mjs';
 
 function describe(results) {
   return results.map((r) => `${r.args.join(' ')} -> ${r.status === 0 ? 'ok' : `exit ${r.status}: ${r.stderr.trim().split('\n').pop()}`}`);
@@ -11,10 +11,10 @@ function classify(existing, source, ctx, recorded) {
   return { op: 'skip', reason: `marketplace already points at ${existing.found.source}; left untouched` };
 }
 
-export function planNative(item, ctx, state, version = ctx.payload.version) {
+export async function planNative(item, ctx, state, version = ctx.payload.version) {
   const source = sourceFor(item.native, ctx.hub.version(version));
   if (ctx.dryRun) return { ...item, source, op: 'install', reason: `would run ${item.native.bin} plugin commands (the host CLI is not called in a dry run)` };
-  const existing = existingMarketplace(item.native, ctx.env);
+  const existing = await existingMarketplaceAsync(item.native, ctx.env);
   if (!existing.ok) return { ...item, source, op: 'error', reason: `${item.native.bin} is not usable: ${existing.error}` };
   const recorded = state.entries.find((e) => e.kind === 'native' && e.agent === item.agent && e.status === 'ok');
   return { ...item, source, recorded, ...classify(existing, source, ctx, recorded) };
@@ -27,9 +27,9 @@ function commandsFor(plan) {
   return plan.op === 'repoint' ? [...native.uninstall(native), ...install] : install;
 }
 
-export function applyNative(plan, ctx, install) {
+export async function applyNative(plan, ctx, install) {
   if (plan.op === 'skip' || plan.op === 'error') return { entry: plan.recorded ?? null, problems: [`${plan.agent}: ${plan.reason}`] };
-  const results = runAll(plan.native, commandsFor(plan), ctx.env, { stopOnError: plan.op !== 'repoint' });
+  const results = await runAllAsync(plan.native, commandsFor(plan), ctx.env, { stopOnError: plan.op !== 'repoint' });
   const ok = results.slice(plan.op === 'repoint' ? plan.native.uninstall(plan.native).length : 0).every((r) => r.status === 0);
   const entry = {
     install, agent: plan.agent, kind: 'native', marketplace: plan.native.marketplace, plugin: plan.native.plugin,

@@ -47,11 +47,11 @@ function rewriteCursorFiles(state, ctx, filter, io) {
   }
 }
 
-function repointNatives(state, ctx, filter, io) {
+async function repointNatives(state, ctx, filter, io) {
   rewriteCursorFiles(state, ctx, filter, io);
   for (const entry of state.entries.filter((e) => e.kind === 'native' && filter(e))) {
-    const plan = planNative({ agent: entry.agent, native: nativeFor(entry.agent) }, ctx, state, ctx.targetVersion);
-    const { entry: next, problems } = applyNative(plan, ctx, entry.install);
+    const plan = await planNative({ agent: entry.agent, native: nativeFor(entry.agent) }, ctx, state, ctx.targetVersion);
+    const { entry: next, problems } = await applyNative(plan, ctx, entry.install);
     for (const problem of problems ?? []) io.out(problem);
     if (next) Object.assign(entry, next);
   }
@@ -73,7 +73,7 @@ export async function update(opts, io) {
   const previous = switchVersion(ctx, payload, target);
   const filter = (e) => !opts.agents.length || opts.agents.includes(e.agent);
   refreshCopies(state, ctx, filter);
-  repointNatives(state, ctx, filter, io);
+  await repointNatives(state, ctx, filter, io);
   writeState(ctx.hub, { ...state, version: target.version, previous });
   prune(ctx.hub);
   io.out(`Updated to ${target.version}${previous && previous !== target.version ? ` (from ${previous})` : ''}.`);

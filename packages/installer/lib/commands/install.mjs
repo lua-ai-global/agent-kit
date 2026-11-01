@@ -70,11 +70,11 @@ export function mergeEntries(previous, next) {
   return [...previous.filter((e) => !replaced.has(entryKey(e))), ...next];
 }
 
-export function buildPlan(selection, ctx) {
+export async function buildPlan(selection, ctx) {
   const state = readState(ctx.hub);
   const dests = destinations(selection, ctx, ctx.payload.manifest.trees);
   const skills = planSkills(dests.dirs, skillNames(ctx.payload.dir), ctx, state);
-  const natives = dests.natives.map((item) => planNative(item, ctx, state));
+  const natives = await Promise.all(dests.natives.map((item) => planNative(item, ctx, state)));
   const files = dests.cursorFiles ? planCursorFiles(ctx, state) : [];
   const created = missingDirs([...dests.dirs, ...files.map((f) => ({ dir: dirname(f.path) }))], baseDir(ctx));
   return { selection, ctx, state, skills, natives, files, notes: dests.notes, createdDirs: created };
@@ -91,20 +91,37 @@ function applyFiles(plan, ctx, key, log) {
   return entries;
 }
 
-export function applyPlan(plan, log = { next: [], problems: [] }) {
+const QUIET = { step: async (_label, _done, fn) => fn() };
+
+function hostName(agent) {
+  return HOSTS.find((h) => h.id === agent)?.name ?? agent;
+}
+
+async function applyNatives(plan, ctx, key, log, progress) {
+  const entries = [];
+  for (const n of plan.natives) {
+    const name = hostName(n.agent);
+    const result = await progress.step(`Installing the ${name} plugin`, (r) => (r.problems?.length ? `${name} plugin not installed` : `${name} plugin installed`), () => applyNative(n, ctx, key));
+    if (result.next) log.next.push(result.next);
+    log.problems.push(...(result.problems ?? []));
+    if (result.entry) entries.push(result.entry);
+  }
+  return entries;
+}
+
+export async function applyPlan(plan, log = { next: [], problems: [] }, progress = QUIET) {
   const { ctx, state } = plan;
   const key = scopeKey(ctx);
   const createdDirs = [...new Set([...(state.installs[key]?.createdDirs ?? []), ...plan.createdDirs])];
-  materialise(ctx.hub, ctx.payload);
-  const currentMode = setCurrent(ctx.hub, ctx.payload.version, { symlinks: ctx.symlinks });
-  const entries = plan.skills.map((a) => applySkill(a, ctx)).filter(Boolean).map((e) => ({ ...e, install: key }));
-  for (const n of plan.natives) {
-    const { entry, next, problems } = applyNative(n, ctx, key);
-    if (next) log.next.push(next);
-    log.problems.push(...(problems ?? []));
-    if (entry) entries.push(entry);
-  }
-  entries.push(...applyFiles(plan, ctx, key, log));
+  const currentMode = await progress.step('Unpacking Lua', 'Lua unpacked', () => {
+    materialise(ctx.hub, ctx.payload);
+    return setCurrent(ctx.hub, ctx.payload.version, { symlinks: ctx.symlinks });
+  });
+  const entries = await progress.step('Adding skills', 'Skills added', () => (
+    plan.skills.map((a) => applySkill(a, ctx)).filter(Boolean).map((e) => ({ ...e, install: key }))
+  ));
+  entries.push(...await applyNatives(plan, ctx, key, log, progress));
+  if (plan.files.length) entries.push(...await progress.step('Setting up Cursor', 'Cursor set up', () => applyFiles(plan, ctx, key, log)));
   const agents = [...new Set([...(state.installs[key]?.agents ?? []), ...plan.selection.agents])];
   const installs = {
     ...state.installs,
@@ -113,6 +130,28 @@ export function applyPlan(plan, log = { next: [], problems: [] }) {
   writeState(ctx.hub, { ...state, version: ctx.payload.version, current: currentMode, installs, entries: mergeEntries(state.entries, entries) });
   const pruned = prune(ctx.hub);
   return { entries, pruned };
+}
+
+function makeProgress(prompts, io) {
+  if (!prompts) {
+    return {
+      async step(_label, done, fn) {
+        const result = await fn();
+        io.out(typeof done === 'function' ? done(result) : done);
+        return result;
+      },
+    };
+  }
+  return {
+    async step(label, done, fn) {
+      const spin = prompts.spinner();
+      spin.start(label);
+      await new Promise((r) => setTimeout(r, 50));
+      const result = await fn();
+      spin.stop(typeof done === 'function' ? done(result) : done);
+      return result;
+    },
+  };
 }
 
 function summary(plan, entries, skillCount) {
@@ -143,17 +182,15 @@ export async function install(opts, io) {
   const skillCount = skillNames(ctx.payload.dir).length;
   const resolved = await resolveSelection(opts, detected, ctx, io, skillCount);
   if (!resolved.selection) return handleUnresolved(resolved, io);
-  const plan = buildPlan(resolved.selection, ctx);
+  const progress = makeProgress(resolved.prompts, io);
+  const plan = await progress.step('Checking your agents', 'Checked your agents', () => buildPlan(resolved.selection, ctx));
   if (ctx.dryRun) {
     printPlan(plan, io);
     io.out('Dry run: nothing was written.');
     return 0;
   }
-  const spin = resolved.prompts?.spinner();
-  spin?.start('Installing');
   const log = { next: [], problems: [] };
-  const { entries } = applyPlan(plan, log);
-  spin?.stop('Installed');
+  const { entries } = await applyPlan(plan, log, progress);
   const result = summary(plan, entries, skillCount);
   report(resolved, result, log, io);
   return result.failed ? 1 : 0;
