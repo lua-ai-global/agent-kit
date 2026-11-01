@@ -1,6 +1,6 @@
 {
   "name": "codex-lua-plugin",
-  "version": "1.16.0",
+  "version": "2.0.0-beta.0",
   "description": "Codex CLI plugin for building, testing, and deploying Lua AI agents (heylua.ai)",
   "private": true,
   "type": "module",

@@ -1,10 +1,13 @@
 {
-  "name": "@lua-ai-global/agent-kit",
-  "version": "1.16.0",
+  "name": "lua-agent-kit",
+  "version": "2.0.0-beta.0",
   "description": "Install the Lua Agent Builder into Claude Code, Codex, Cursor and every agent that reads .agents/skills",
   "type": "module",
   "license": "MIT",
+  "homepage": "https://docs.heylua.ai",
+  "keywords": ["lua", "claude-code", "codex", "cursor", "agent-skills", "ai-agents"],
   "bin": {
+    "lua-agent-kit": "bin/agent-kit.mjs",
     "agent-kit": "bin/agent-kit.mjs"
   },
   "files": [

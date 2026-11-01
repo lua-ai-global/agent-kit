@@ -3,7 +3,7 @@
   "displayName": "Lua Agent Builder",
   "description": "Build, test, and deploy Lua AI agents (heylua.ai) from inside Codex CLI — 24 skills, 5 specialised subagents, MCP-first integrations to 250+ third-party services via Unified.to, sandbox-then-prod deploys with safety gates.",
   "shortDescription": "Build, test, and deploy Lua AI agents directly from Codex CLI.",
-  "version": "1.16.0",
+  "version": "2.0.0-beta.0",
   "author": {
     "name": "Lua AI",
     "email": "support@heylua.ai",

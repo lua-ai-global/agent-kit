@@ -69,7 +69,7 @@ export async function apiRequest(path, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'X-Lua-Client': 'codex-plugin/1.16.0',
+        'X-Lua-Client': 'codex-plugin/2.0.0-beta.0',
       },
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,

@@ -9,10 +9,10 @@ const COMMANDS = { install, update, uninstall, doctor };
 const USAGE = `Lua Agent Builder installer
 
 Usage:
-  agent-kit install   [--agent <id>...] [--global|--project] [--copy] [--dry-run] [--yes] [--skills-only]
-  agent-kit update    [--agent <id>...] [--to <version>]
-  agent-kit uninstall [--agent <id>...] [--purge-data]
-  agent-kit doctor    [--json]
+  npx lua-agent-kit install   [--agent <id>...] [--global|--project] [--copy] [--dry-run] [--yes] [--skills-only]
+  npx lua-agent-kit update    [--agent <id>...] [--to <version>]
+  npx lua-agent-kit uninstall [--agent <id>...] [--purge-data]
+  npx lua-agent-kit doctor    [--json]
 
 Agents: claude-code, codex, cursor, gemini, copilot, grok, amp, opencode, windsurf ('*' for all).
 Nothing is sent anywhere: the installer has no telemetry and never reads a credential.`;
@@ -49,7 +49,7 @@ export function parseArgs(argv) {
 }
 
 export async function run(argv, io) {
-  if (!argv.length || ['-h', '--help', 'help'].includes(argv[0])) {
+  if (['-h', '--help', 'help'].includes(argv[0])) {
     io.out(USAGE);
     return 0;
   }
@@ -57,6 +57,7 @@ export async function run(argv, io) {
     io.out(packageVersion());
     return 0;
   }
+  if (!argv.length || argv[0].startsWith('-')) argv = ['install', ...argv];
   const opts = parseArgs(argv);
   const command = COMMANDS[opts.command];
   if (!command) {

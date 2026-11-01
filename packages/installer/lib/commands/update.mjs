@@ -62,7 +62,7 @@ export async function update(opts, io) {
   const ctx = attachPayload(makeContext(opts, io.env), payload);
   const state = readState(ctx.hub);
   if (!state.entries.length) {
-    io.out('Nothing is installed; run `agent-kit install` first.');
+    io.out('Nothing is installed; run `npx lua-agent-kit install` first.');
     return 0;
   }
   const target = targetVersion(opts, ctx, payload);

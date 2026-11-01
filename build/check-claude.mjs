@@ -27,13 +27,13 @@ async function emitTo(version, banner) {
   return out;
 }
 
-function probeProblems(baseline, probe, stamped) {
+function probeProblems(baseline, probe, stamped, baselineVersion) {
   const result = compareTrees(baseline, probe);
   const problems = [...result.missing, ...result.extra, ...result.mode.map((m) => m.rel)].map((rel) => `probe: structural difference at ${rel}`);
   for (const c of result.content) {
     if (!stamped.has(c.rel)) problems.push(`probe: ${c.rel} changes with the version but is not a stamped file`);
     for (const l of c.lines) {
-      if (String(l.actual).split(PROBE_VERSION).join(SNAPSHOT_VERSION) !== l.expected) problems.push(`probe: ${c.rel}:${l.line} is not a version-only change`);
+      if (String(l.actual).split(PROBE_VERSION).join(baselineVersion) !== l.expected) problems.push(`probe: ${c.rel}:${l.line} is not a version-only change`);
     }
   }
   return { problems, lines: result.content.reduce((n, c) => n + c.lines.length, 0), files: result.content.length };
@@ -49,7 +49,7 @@ try {
   const versionOnly = (rel) => version !== SNAPSHOT_VERSION && readFileSync(join(exact, rel), 'utf8').split(version).join(SNAPSHOT_VERSION) === readFileSync(join(SNAPSHOT, rel), 'utf8');
   const found = observedDifferences(result, versionOnly);
   if (found.size) process.stdout.write(`${formatByCategory(found, DECLARED)}\n`);
-  const p = probeProblems(exact, probe, stamped);
+  const p = probeProblems(exact, probe, stamped, version);
   const problems = [...auditResiduals(found, DECLARED), ...p.problems];
   if (problems.length) {
     process.stderr.write(`${formatResult(result)}\n${problems.join('\n')}\nclaude-code gate FAILED\n`);

@@ -1,6 +1,6 @@
 {
-  "name": "lua-agent-kit",
-  "version": "1.16.0",
+  "name": "lua-agent-kit-workspace",
+  "version": "2.0.0-beta.0",
   "private": true,
   "type": "module",
   "description": "One source for the Lua Agent Builder plugin on every coding agent",
