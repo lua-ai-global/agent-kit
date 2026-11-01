@@ -9,7 +9,7 @@ const FILES = [
   { template: 'cursor-mcp.json', target: 'mcp.json', role: 'mcp' },
 ];
 
-export const CURSOR_NEXT = 'Cursor runs user hooks from ~/.cursor/hooks.json; project hooks in .cursor/hooks.json need a trusted workspace. Restart Cursor to load them.';
+export const CURSOR_NEXT = 'Cursor: restart it to load Lua.';
 
 function sha(text) {
   return createHash('sha256').update(text).digest('hex');

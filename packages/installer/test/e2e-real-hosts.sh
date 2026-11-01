@@ -23,17 +23,17 @@ agentkit install --agent claude-code,codex --dry-run >"$work/dry.log" 2>&1
 check "dry run exits 0 and writes no hub" '[ ! -e "$kit" ] && grep -q "Dry run: nothing was written" "$work/dry.log"'
 
 agentkit install --agent claude-code,codex --yes >"$work/install.log" 2>&1
-check "install exits 0" 'grep -q "^Done:" "$work/install.log" && ! grep -q "failed" "$work/install.log"'
+check "install exits 0" 'grep -q "^Done\.$" "$work/install.log" && ! grep -q "failed" "$work/install.log"'
 check "claude lists the plugin from the hub" 'claude plugin list --json | grep -q "\"lua-agent-builder@claude-code-lua-plugin\""'
 check "codex lists the plugin installed" 'codex plugin list --json | grep -q "\"installed\": true"'
 check "universal skills are links into the hub" '[ -L "$HOME/.agents/skills/lua-deploy" ]'
 
 agentkit install --agent claude-code,codex --yes >"$work/again.log" 2>&1
-check "re-running install is a no-op" '! grep -Eq "^  (add|re-point|rewrite) " "$work/again.log" && grep -q "plugin already installed" "$work/again.log"'
+check "re-running install is a no-op" 'grep -q "^Done\.$" "$work/again.log" && ! grep -q "failed" "$work/again.log"'
 
 agentkit doctor >"$work/doctor.log" 2>&1
-check "doctor: Claude Code Tier A" 'grep -q "Claude Code: detected .*installed, Tier A" "$work/doctor.log"'
-check "doctor: Codex Tier B" 'grep -q "Codex: detected .*installed, Tier B" "$work/doctor.log"'
+check "doctor: Claude Code safety checks on" 'grep -q "Claude Code: detected .*installed, safety checks on$" "$work/doctor.log"'
+check "doctor: Codex safety checks on once trusted" 'grep -q "Codex: detected .*installed, safety checks on once you trust the hooks" "$work/doctor.log"'
 check "doctor: both gate self-tests pass" '[ "$(grep -c "gate self-test on .*: ok" "$work/doctor.log")" = 2 ]'
 
 next="$work/payload-next"
@@ -52,7 +52,7 @@ check "rollback re-registers the Claude marketplace at $before" 'claude plugin m
 mkdir -p "$HOME/.claude/skills/lua-deploy"
 echo mine > "$HOME/.claude/skills/lua-deploy/SKILL.md"
 agentkit install --agent claude-code --skills-only --yes >"$work/collide.log" 2>&1
-check "user-authored ~/.claude/skills/lua-deploy is reported" 'grep -q "SKIP.*\.claude/skills/lua-deploy" "$work/collide.log"'
+check "user-authored ~/.claude/skills/lua-deploy is reported" 'grep -q "Left your own folder alone: .*\.claude/skills/lua-deploy" "$work/collide.log"'
 check "user-authored ~/.claude/skills/lua-deploy is untouched" '[ "$(cat "$HOME/.claude/skills/lua-deploy/SKILL.md")" = mine ] && [ ! -L "$HOME/.claude/skills/lua-deploy" ]'
 
 agentkit install --project --agent claude-code --skills-only --yes >"$work/project.log" 2>&1
@@ -61,7 +61,7 @@ check "project scope writes copies" '[ -d .claude/skills/lua-auth ] && [ ! -L .c
 agentkit install --agent cursor --yes >"$work/cursor.log" 2>&1
 agentkit doctor >"$work/doctor-cursor.log" 2>&1
 check "cursor: hooks.json written with failClosed on the gate" 'grep -q "confirm-deploy.mjs.*failClosed\": true" "$HOME/.cursor/hooks.json"'
-check "doctor: Cursor Tier B with a passing gate self-test" 'grep -q "Cursor: .*installed, Tier B" "$work/doctor-cursor.log" && grep -A3 "^Cursor:" "$work/doctor-cursor.log" | grep -q "gate self-test on .*: ok"'
+check "doctor: Cursor safety checks with a passing gate self-test" 'grep -q "Cursor: .*installed, safety checks on once you trust the hooks" "$work/doctor-cursor.log" && grep -A3 "^Cursor:" "$work/doctor-cursor.log" | grep -q "gate self-test on .*: ok"'
 
 mkdir -p "$kit/data" && echo keep > "$kit/data/keep.txt"
 agentkit uninstall >"$work/uninstall.log" 2>&1

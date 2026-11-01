@@ -42,8 +42,8 @@ function rewriteCursorFiles(state, ctx, filter, io) {
     const plan = planCursorFiles(scoped, state, ctx.targetVersion).find((p) => p.path === entry.path);
     if (!plan) continue;
     const { entry: next, line } = applyCursorFile(plan, entry.install, join(ctx.hub.version(ctx.targetVersion), 'cursor'));
-    io.out(`  ${line}`);
     if (next) Object.assign(entry, next);
+    else io.out(line);
   }
 }
 
@@ -51,8 +51,8 @@ function repointNatives(state, ctx, filter, io) {
   rewriteCursorFiles(state, ctx, filter, io);
   for (const entry of state.entries.filter((e) => e.kind === 'native' && filter(e))) {
     const plan = planNative({ agent: entry.agent, native: nativeFor(entry.agent) }, ctx, state, ctx.targetVersion);
-    const { entry: next, lines } = applyNative(plan, ctx, entry.install);
-    for (const line of lines) io.out(`  ${line}`);
+    const { entry: next, problems } = applyNative(plan, ctx, entry.install);
+    for (const problem of problems ?? []) io.out(problem);
     if (next) Object.assign(entry, next);
   }
 }
@@ -71,13 +71,12 @@ export async function update(opts, io) {
     return 1;
   }
   const previous = switchVersion(ctx, payload, target);
-  io.out(`current: ${previous ?? 'none'} -> ${target.version}`);
   const filter = (e) => !opts.agents.length || opts.agents.includes(e.agent);
-  for (const path of refreshCopies(state, ctx, filter)) io.out(`  rewrote copy ${path} (copy mode rewrites files in place)`);
+  refreshCopies(state, ctx, filter);
   repointNatives(state, ctx, filter, io);
   writeState(ctx.hub, { ...state, version: target.version, previous });
-  const pruned = prune(ctx.hub);
-  if (pruned.length) io.out(`  pruned hub versions: ${pruned.join(', ')}`);
-  io.out(`Links follow ${ctx.hub.current}; roll back with \`agent-kit update --to ${previous ?? target.version}\`.`);
+  prune(ctx.hub);
+  io.out(`Updated to ${target.version}${previous && previous !== target.version ? ` (from ${previous})` : ''}.`);
+  if (previous && previous !== target.version) io.out(`Roll back with: npx lua-agent-kit update --to ${previous}`);
   return 0;
 }

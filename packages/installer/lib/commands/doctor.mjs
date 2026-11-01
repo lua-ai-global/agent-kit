@@ -92,18 +92,17 @@ function printPlugin(h, io) {
 }
 
 function printHost(h, io) {
-  io.out(`${h.name}: ${seenText(h.detected)}; ${h.installed ? `installed, Tier ${h.tier}` : 'not installed'}`);
+  io.out(`${h.name}: ${seenText(h.detected)}; ${h.installed ? `installed, ${h.tierText}` : 'not installed'}`);
   if (!h.installed) return;
   const copyNote = h.copies ? ' (copy mode: update rewrites files in place)' : '';
   if (h.links || h.copies) io.out(`  skills: ${h.links} link(s), ${h.copies} copy(ies)${copyNote}`);
   if (h.plugin) printPlugin(h, io);
-  io.out(`  ${h.tierText}`);
 }
 
 function printReport(report, io) {
   const hub = report.hub;
   io.out(`hub: ${hub.root} (current ${hub.current ?? 'none'}, ${hub.mode}; kept: ${hub.versions.join(', ') || 'none'})`);
-  io.out(`universal skills: ${report.universal.links} link(s), ${report.universal.copies} copy(ies). ${report.universal.tierText}`);
+  io.out(`universal skills: ${report.universal.links} link(s), ${report.universal.copies} copy(ies), ${report.universal.tierText}`);
   for (const h of report.hosts) if (h.installed || h.detected.present || h.adapter) printHost(h, io);
   io.out(`credential source: ${report.credentialSources.join(', ') || 'none found'} (values are never read)`);
 }

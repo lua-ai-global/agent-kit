@@ -98,7 +98,9 @@ describe('install', () => {
     const box = sandbox('main');
     const first = cli(box, ['install', '--agent', 'claude-code', '--agent', 'codex', '--yes']);
     assert.equal(first.code, 0, first.err + first.out);
-    assert.match(first.out, /Tier C: the deploy gate is NOT enforced/);
+    assert.match(first.out, /^Installed \d+ skills to 3 agents/m);
+    assert.match(first.out, /Codex: run \/hooks once/);
+    assert.doesNotMatch(first.out, /Tier/);
     const link = join(box.home, '.agents', 'skills', 'lua-deploy');
     assert.equal(lstatSync(link).isSymbolicLink(), true);
     assert.equal(readlinkSync(link), join(box.kit, 'current', 'skills', 'lua-deploy'));
@@ -113,8 +115,7 @@ describe('install', () => {
     }
     const again = cli(box, ['install', '--agent', 'claude-code,codex', '--yes']);
     assert.equal(again.code, 0, again.err);
-    assert.doesNotMatch(again.out, /^ {2}(add|re-point|rewrite) /m);
-    assert.match(again.out, /plugin already installed/);
+    assert.match(again.out, /^Installed \d+ skills to 3 agents/m);
     assert.deepEqual(state(box).entries.map((e) => e.path ?? e.source), s.entries.map((e) => e.path ?? e.source));
   });
 
@@ -156,7 +157,7 @@ describe('install', () => {
     writeFileSync(join(mine, 'SKILL.md'), 'mine\n');
     const r = cli(box, ['install', '--agent', 'claude-code', '--skills-only', '--yes']);
     assert.equal(r.code, 0, r.err);
-    assert.match(r.out, /SKIP\s+.*\.claude\/skills\/lua-deploy: a file or directory this kit did not create/);
+    assert.match(r.out, /Left your own folder alone: .*\.claude\/skills\/lua-deploy/);
     assert.equal(readFileSync(join(mine, 'SKILL.md'), 'utf8'), 'mine\n');
     assert.equal(lstatSync(join(box.home, '.claude', 'skills', 'lua-auth')).isSymbolicLink(), true);
     cli(box, ['uninstall']);
@@ -239,7 +240,6 @@ describe('project scope and uninstall', () => {
     writeFileSync(join(box.kit, 'data', 'keep.txt'), 'x');
     const r = cli(box, ['install', '--project', '--agent', 'claude-code', '--skills-only', '--yes']);
     assert.equal(r.code, 0, r.err);
-    assert.match(r.out, /committable/);
     assert.equal(lstatSync(join(box.project, '.claude', 'skills', 'lua-deploy')).isDirectory(), true);
     assert.equal(lstatSync(join(box.project, '.agents', 'skills', 'lua-deploy')).isDirectory(), true);
     const dirty = spawnSync('git', ['status', '--porcelain'], { cwd: box.project, encoding: 'utf8' }).stdout;

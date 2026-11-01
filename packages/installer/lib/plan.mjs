@@ -17,7 +17,7 @@ function wantsCursorFiles(host, selection, payloadTrees) {
 
 function adapterNote(host, selection, filesHost) {
   if (!hasAdapter(host) || selection.skillsOnly || filesHost) return null;
-  return `${host.name}: no plugin in this payload yet, installing skills only (Tier C).`;
+  return `${host.name}: skills only for now.`;
 }
 
 export function destinations(selection, ctx, payloadTrees) {

@@ -21,7 +21,7 @@ export const NATIVE = {
     install: (n, source) => [['plugin', 'marketplace', 'add', source], ['plugin', 'install', n.plugin, '--scope', 'user']],
     uninstall: (n) => [['plugin', 'uninstall', n.plugin], ['plugin', 'marketplace', 'remove', n.marketplace]],
     loadedFrom: (source) => source,
-    next: 'Start a new Claude Code session; run /lua-doctor once to offer the permission template.',
+    next: 'Claude Code: start a new session to load Lua.',
   },
   codex: {
     bin: 'codex',
@@ -35,7 +35,7 @@ export const NATIVE = {
     loadedFrom: (source, { env, home }) => join(
       env.CODEX_HOME || join(home, '.codex'), 'plugins', 'cache', 'lua-ai-marketplace', 'lua-agent-builder', manifestVersion(join(source, '.codex-plugin', 'plugin.json')),
     ),
-    next: 'Open Codex and run /hooks to review and trust the Lua Agent Builder hooks. Until you do, the deploy gate is not armed and Codex is Tier C.',
+    next: 'Codex: run /hooks once and trust the Lua hooks.',
   },
 };
 

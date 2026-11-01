@@ -28,16 +28,15 @@ function commandsFor(plan) {
 }
 
 export function applyNative(plan, ctx, install) {
-  if (plan.op === 'skip' || plan.op === 'error') return { entry: plan.recorded ?? null, lines: [`${plan.agent}: ${plan.reason}`] };
+  if (plan.op === 'skip' || plan.op === 'error') return { entry: plan.recorded ?? null, problems: [`${plan.agent}: ${plan.reason}`] };
   const results = runAll(plan.native, commandsFor(plan), ctx.env, { stopOnError: plan.op !== 'repoint' });
   const ok = results.slice(plan.op === 'repoint' ? plan.native.uninstall(plan.native).length : 0).every((r) => r.status === 0);
   const entry = {
     install, agent: plan.agent, kind: 'native', marketplace: plan.native.marketplace, plugin: plan.native.plugin,
     source: plan.source, status: ok ? 'ok' : 'failed',
   };
-  const lines = plan.op === 'match' ? [`${plan.agent}: plugin already installed from ${plan.source}`] : describe(results);
-  if (ok) lines.push(`${plan.agent}: ${plan.native.next}`);
-  return { entry, lines };
+  if (!ok) return { entry, problems: [`${plan.agent}: plugin install failed`, ...describe(results.filter((r) => r.status !== 0))] };
+  return { entry, next: plan.native.next };
 }
 
 export function uninstallNative(entry, native, ctx) {

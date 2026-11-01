@@ -43,9 +43,9 @@ export const HOSTS = Object.freeze([
 ]);
 
 export const TIER_TEXT = {
-  A: 'Tier A: the deploy gate is enforced by the plugin hooks, and the permission template keeps safe reads prompt-free.',
-  B: 'Tier B: the deploy gate is enforced by the plugin hooks once you trust them; safe reads use the host\'s own approval prompts.',
-  C: 'Tier C: the deploy gate is NOT enforced on this agent. It has no hook that can stop a command, so the skills only print production commands for you to run yourself.',
+  A: 'safety checks on',
+  B: 'safety checks on once you trust the hooks',
+  C: 'skills only',
 };
 
 export function hostById(id) {

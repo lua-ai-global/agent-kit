@@ -7,7 +7,8 @@ import { exists, isInside } from '../fsops.mjs';
 import { applyNative, planNative } from '../native-ops.mjs';
 import { loadPayload, skillNames } from '../payload.mjs';
 import { applySkill, baseDir, destinations, planSkills } from '../plan.mjs';
-import { resolveSelection, summaryLines, tierNotices } from '../selection.mjs';
+import { resolveSelection, selectedNames } from '../selection.mjs';
+import { listNames } from '../ui.mjs';
 
 const OP_TEXT = {
   create: 'add', repoint: 're-point', rewrite: 'rewrite', match: 'already matches', skip: 'SKIP',
@@ -38,13 +39,7 @@ function handleUnresolved(resolved, io) {
 }
 
 function printPlan(plan, io) {
-  io.out(`Lua Agent Builder ${plan.ctx.payload.version} -> ${plan.ctx.hub.root} (${plan.ctx.scope} scope)`);
-  for (const line of summaryLines(plan.selection, plan.ctx)) io.out(`  ${line}`);
-  for (const note of plan.notes) io.out(`  note: ${note}`);
-  for (const notice of tierNotices(plan.selection)) io.out(notice);
-  if (plan.ctx.scope === 'project') {
-    io.out('Project scope: these files are copies inside the repository. They are committable and will reach your teammates; project hooks need workspace trust.');
-  }
+  io.out(`Would install to: ${selectedNames(plan.selection, plan.ctx).join(', ')}`);
   printActions(plan, io);
 }
 
@@ -85,18 +80,18 @@ export function buildPlan(selection, ctx) {
   return { selection, ctx, state, skills, natives, files, notes: dests.notes, createdDirs: created };
 }
 
-function applyFiles(plan, ctx, key, io) {
+function applyFiles(plan, ctx, key, log) {
   const entries = [];
   for (const f of plan.files) {
     const { entry, line } = applyCursorFile(f, key, join(ctx.hub.version(ctx.payload.version), 'cursor'));
-    io.out(`  ${line}`);
     if (entry) entries.push(entry);
+    else log.problems.push(line);
   }
-  if (entries.some((e) => e.role === 'hooks')) io.out(`  cursor: ${CURSOR_NEXT}`);
+  if (entries.some((e) => e.role === 'hooks')) log.next.push(CURSOR_NEXT);
   return entries;
 }
 
-export function applyPlan(plan, io) {
+export function applyPlan(plan, log = { next: [], problems: [] }) {
   const { ctx, state } = plan;
   const key = scopeKey(ctx);
   const createdDirs = [...new Set([...(state.installs[key]?.createdDirs ?? []), ...plan.createdDirs])];
@@ -104,11 +99,12 @@ export function applyPlan(plan, io) {
   const currentMode = setCurrent(ctx.hub, ctx.payload.version, { symlinks: ctx.symlinks });
   const entries = plan.skills.map((a) => applySkill(a, ctx)).filter(Boolean).map((e) => ({ ...e, install: key }));
   for (const n of plan.natives) {
-    const { entry, lines } = applyNative(n, ctx, key);
-    for (const line of lines) io.out(`  ${line}`);
+    const { entry, next, problems } = applyNative(n, ctx, key);
+    if (next) log.next.push(next);
+    log.problems.push(...(problems ?? []));
     if (entry) entries.push(entry);
   }
-  entries.push(...applyFiles(plan, ctx, key, io));
+  entries.push(...applyFiles(plan, ctx, key, log));
   const agents = [...new Set([...(state.installs[key]?.agents ?? []), ...plan.selection.agents])];
   const installs = {
     ...state.installs,
@@ -119,21 +115,46 @@ export function applyPlan(plan, io) {
   return { entries, pruned };
 }
 
+function summary(plan, entries, skillCount) {
+  const names = selectedNames(plan.selection, plan.ctx);
+  const kept = plan.skills.filter((a) => a.op === 'skip').map((a) => a.path);
+  const failed = entries.filter((e) => e.status === 'failed').length;
+  return { names, kept, failed, headline: `Installed ${skillCount} skills to ${names.length} agents (${listNames(names)})` };
+}
+
+function report(resolved, result, log, io) {
+  const p = resolved.prompts;
+  const say = p ? (t) => p.log.warn(t) : (t) => io.out(t);
+  for (const k of result.kept) say(`Left your own folder alone: ${k}`);
+  for (const problem of log.problems) say(problem);
+  if (p) {
+    p.log.success(result.headline);
+    p.outro(log.next.length ? log.next.join('\n') : 'Done');
+  } else {
+    io.out(result.headline);
+    for (const n of log.next) io.out(n);
+    io.out(`Done${result.failed ? `, ${result.failed} failed` : ''}.`);
+  }
+}
+
 export async function install(opts, io) {
   const ctx = attachPayload(makeContext(opts, io.env), loadPayload());
   const detected = detectAll(ctx);
-  const resolved = await resolveSelection(opts, detected, ctx, io);
+  const skillCount = skillNames(ctx.payload.dir).length;
+  const resolved = await resolveSelection(opts, detected, ctx, io, skillCount);
   if (!resolved.selection) return handleUnresolved(resolved, io);
   const plan = buildPlan(resolved.selection, ctx);
-  printPlan(plan, io);
   if (ctx.dryRun) {
+    printPlan(plan, io);
     io.out('Dry run: nothing was written.');
     return 0;
   }
-  const { entries } = applyPlan(plan, io);
-  const skipped = [...plan.skills, ...plan.files].filter((a) => a.op === 'skip').length
-    + plan.natives.filter((n) => n.op === 'skip' || n.op === 'error').length;
-  const failed = entries.filter((e) => e.status === 'failed').length;
-  io.out(`Done: ${entries.length} recorded in ${ctx.hub.state}${skipped ? `, ${skipped} left untouched` : ''}${failed ? `, ${failed} failed` : ''}.`);
-  return failed ? 1 : 0;
+  const spin = resolved.prompts?.spinner();
+  spin?.start('Installing');
+  const log = { next: [], problems: [] };
+  const { entries } = applyPlan(plan, log);
+  spin?.stop('Installed');
+  const result = summary(plan, entries, skillCount);
+  report(resolved, result, log, io);
+  return result.failed ? 1 : 0;
 }
