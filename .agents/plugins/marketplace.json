@@ -1,0 +1,14 @@
+{
+  "name": "lua-ai",
+  "displayName": "Lua AI",
+  "description": "Lua AI's Codex plugin catalog",
+  "plugins": [
+    {
+      "name": "lua-agent-builder",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex"
+      }
+    }
+  ]
+}

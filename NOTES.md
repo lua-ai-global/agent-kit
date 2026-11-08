@@ -51,14 +51,14 @@ Fixed in the kit after JM's decision that the live plugins are sunset (each is a
 11. Claude `lib/hook-runtime.mjs` `isMainScript()` compares `resolve()` paths, but Node resolves the main module through symlinks. When the plugin path crosses a symlink (a symlinked HOME, `/var` on macOS, a marketplace registered through a symlinked directory), every hook silently does nothing, and the deploy gate is off. The installer's doctor self-test caught this: a marketplace registered at `~/.lua/agent-kit/current/claude-code` let a bare `lua deploy all` through. Fixed: there is now one runtime, `packages/core/lib/hook-runtime.mjs`, on every host, Claude Code included, and `isMainScript()` compares real paths. `test/lib/hook-runtime-symlink.test.mjs` runs the gate through a symlinked plugin path under each host payload, and an installer test runs it through both the real version path and the `current` symlink. The installer keeps registering the real path.
 12. A hook warning on Cursor rendered `{permission: "allow"}`, which can auto-approve the command. Decision: a warning maps to `ask`, the one non-approving permission Cursor has that does not block; the message goes to both `user_message` and `agent_message`. A test asserts that no host renders a warning as an approval.
 
-## Installer
+## Distribution
 
-- `packages/installer` is `@lua-ai-global/agent-kit` (`bin: agent-kit`). It is packed with `npm pack`, never published.
-- Hub: `~/.lua/agent-kit/<version>/` (or `$XDG_DATA_HOME/lua/agent-kit`), `current` is a relative symlink to the version, `installed.json` records every path written. Skill links point at `current/skills/<name>`, so `update` and rollback switch all of them with one rename.
-- Plugins go through the hosts' own CLIs at the real version path: `claude plugin marketplace add` plus `claude plugin install`, `codex plugin marketplace add` plus `codex plugin add`. A marketplace of the same name from anywhere else is reported and left alone. Update and rollback remove and re-add the marketplace at the new version path.
-- npm drops `.gitignore` and `.npmrc` from a package, so the payload stores them as `<name>.agent-kit-dotfile` and the hub restores them; the hub trees are byte-identical to `dist/`.
-- Detection reads the config directory and looks for the binary on PATH without running it: running `grok --version` creates `~/.grok`.
-- `doctor` never reads a credential value. It reports which sources exist (`env`, a `.env` file, a session file, the credentials file) by presence only.
+- There is no installer package. The repo itself is the install source:
+  - skills for every agent: `npx skills add lua-ai-global/agent-kit` reads the root `skills/` folder (the universal build);
+  - Claude Code plugin: `claude plugin marketplace add lua-ai-global/agent-kit`, catalog `.claude-plugin/marketplace.json` (`lua-ai`), plugin at `dist/claude-code/plugins/lua-agent-builder`;
+  - Codex plugin: `codex plugin marketplace add lua-ai-global/agent-kit`, catalog `.agents/plugins/marketplace.json` (`lua-ai`), plugin at `dist/codex`.
+- Codex 0.154 only resolves a catalog entry whose `source` is `{ "source": "local", "path": … }` or a plain path string; `{ "type": "path", … }` installs nothing ("plugin was not found in marketplace"). Codex also skips marketplaces that live under the system temp folder, so test from a normal folder.
+- The npm package `lua-agent-kit` 2.0.0-beta.0 (published 2026-11-01 with the old installer) is deprecated in favour of the commands above.
 - Universal skills (`dist/universal`, mirrored to the repo's `skills/`) are the Tier C build: spec frontmatter, a Tier C notice at the top of every skill, Claude-only vocabulary rewritten by `src/glossary/universal.json`, knowledge and agent briefs under `lua-agent-builder/references/`. `lua-qa` is left out (the QA harness is Claude-only).
 - Known overlap: Codex reads `~/.agents/skills`, so a Codex user with the plugin also sees the universal skills. They are print-only, so the overlap is safe but duplicated.
 - Not done: detecting network or FAT mounts for the copy fallback; Windows was not run (the copy path is exercised with `LUA_AGENT_KIT_NO_SYMLINKS=1`).
