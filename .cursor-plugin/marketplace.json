@@ -1,0 +1,17 @@
+{
+  "name": "lua-ai",
+  "owner": {
+    "name": "Lua AI",
+    "email": "support@heylua.ai"
+  },
+  "metadata": {
+    "description": "Lua AI's Cursor plugin catalog"
+  },
+  "plugins": [
+    {
+      "name": "lua-agent-builder",
+      "source": "dist/cursor",
+      "description": "Safety checks and Lua platform tools for building Lua AI agents in Cursor"
+    }
+  ]
+}

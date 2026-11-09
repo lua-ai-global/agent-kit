@@ -26,11 +26,19 @@ codex plugin add lua-agent-builder@lua-ai
 
 In Codex, run `/hooks` once and trust the Lua hooks.
 
+Safety checks and Lua tools, for Cursor:
+
+```bash
+agent plugin marketplace add https://github.com/lua-ai-global/agent-kit
+```
+
+Then open `/plugins` in `agent` (or **Customize** in the Cursor app) and install `lua-agent-builder`.
+
 ## What you get
 
 - **Skills**: how to create, test, push and deploy Lua agents with [lua-cli](https://www.npmjs.com/package/lua-cli).
-- **Safety checks** (Claude Code and Codex plugins): your agent can't deploy to production or print your API key without asking you first.
-- **Lua tools** (Claude Code and Codex plugins): your agent can see your agents, versions and logs directly.
+- **Safety checks** (Claude Code, Codex and Cursor plugins): your agent can't deploy to production or print your API key without asking you first.
+- **Lua tools** (Claude Code, Codex and Cursor plugins): your agent can see your agents, versions and logs directly.
 
 On other agents, the skills show you the production commands to run yourself instead of running them.
 

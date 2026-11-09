@@ -83,7 +83,7 @@ export function hostDefault(root, host) {
 }
 
 function cursorHandler(entry, failClosed) {
-  const handler = { command: `node "{{PLUGIN_ROOT}}/hooks/${entry.module}.mjs"`, timeout: entry.timeout };
+  const handler = { command: `node ./hooks/${entry.module}.mjs`, timeout: entry.timeout };
   if (failClosed.includes(entry.module)) handler.failClosed = true;
   return handler;
 }
@@ -99,7 +99,7 @@ export function renderCursorHooks(root) {
 }
 
 export function renderCursorMcp(root) {
-  const profile = { pluginRoot: '{{PLUGIN_ROOT}}/', mcpEnvSpelling: '${env:NAME}', mcpStyle: { inlinePrimitiveArrays: true } };
+  const profile = { pluginRoot: '${CURSOR_PLUGIN_ROOT}/', mcpStyle: { inlinePrimitiveArrays: true } };
   return renderMcpJson(root, profile);
 }
 

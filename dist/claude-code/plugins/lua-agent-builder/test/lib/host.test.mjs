@@ -98,8 +98,14 @@ describe('render', () => {
     expect(() => protocolFor('emacs')).toThrow('unknown host');
   });
 
-  test('no decision renders nothing', () => {
-    for (const host of HOSTS) expect(render(host, null)).toEqual({ code: 0 });
+  test('no decision renders nothing on Claude Code and Codex', () => {
+    for (const host of ['claude-code', 'codex']) expect(render(host, null)).toEqual({ code: 0 });
+  });
+
+  test('no decision on Cursor is an empty response, because Cursor blocks a fail-closed hook that prints nothing', () => {
+    const out = render('cursor', null);
+    expect(out.code).toBe(0);
+    expect(JSON.parse(out.stdout)).toEqual({});
   });
 
   test('default reasons name the hook', () => {

@@ -63,7 +63,10 @@ function terminal(message) {
   return message.endsWith('\n') ? message : `${message}\n`;
 }
 
+const silent = () => ({ code: 0 });
+
 const claudeCode = {
+  pass: silent,
   block: (reason) => ({ stderr: terminal(reason), code: 2 }),
   allow: (reason) => ({ stdout: preToolUseDecision('allow', reason), code: 0 }),
   ask: (reason) => ({ stdout: preToolUseDecision('ask', reason), code: 0 }),
@@ -74,6 +77,7 @@ export const ASK_UNSUPPORTED_SUFFIX =
   ' This host cannot ask for confirmation from a hook, so the command was not run. Run it yourself in your own terminal if you want it.';
 
 const codex = {
+  pass: silent,
   block: claudeCode.block,
   allow(reason, input) {
     const command = commandString(input?.tool_input?.command);
@@ -85,6 +89,7 @@ const codex = {
 };
 
 const cursor = {
+  pass: () => ({ stdout: line({}), code: 0 }),
   block: (reason) => ({ stdout: line({ permission: 'deny', user_message: reason, agent_message: reason }), code: 0 }),
   allow: (reason) => ({ stdout: line({ permission: 'allow', user_message: reason }), code: 0 }),
   ask: (reason) => ({ stdout: line({ permission: 'ask', user_message: reason, agent_message: reason }), code: 0 }),
@@ -110,7 +115,7 @@ function permissionKind(decision, eventName) {
 }
 
 function renderWarn(host, protocol, warn, eventName) {
-  if (!warn) return { code: 0 };
+  if (!warn) return protocol.pass();
   if (!eventName && host !== 'cursor') return { stderr: `⚠ ${warn}\n`, code: 0 };
   return protocol.context(eventName, warn);
 }

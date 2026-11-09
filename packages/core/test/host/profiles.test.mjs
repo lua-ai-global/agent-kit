@@ -62,7 +62,7 @@ describe.each(HOSTS)('host profile %s', (host) => {
     expect(input.tool_input.command).toBe(command);
     const output = render(host, decide(input, INTERACTIVE), { hookName: hook, eventName: event, input });
     if (kind === 'none') {
-      expect(output).toEqual({ code: 0 });
+      expect(output).toEqual(host === 'cursor' ? { stdout: '{}\n', code: 0 } : { code: 0 });
       return;
     }
     EXPECTATIONS[host][kind](output, command);

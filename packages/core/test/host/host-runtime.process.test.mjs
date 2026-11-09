@@ -53,7 +53,7 @@ describe.each(Object.keys(ENV_BY_HOST))('shipped hook processes under %s', (host
   test('confirm-deploy lets the confirmed form through untouched', () => {
     const r = run(host, 'confirm-deploy', 'LUA_DEPLOY_CONFIRMED=1 lua deploy all');
     expect(r.code).toBe(0);
-    expect(r.stdout).toBe('');
+    expect(r.stdout).toBe(host === 'cursor' ? '{}\n' : '');
   });
 
   test('block-auth-configure blocks the credential prompt under every binary name', () => {

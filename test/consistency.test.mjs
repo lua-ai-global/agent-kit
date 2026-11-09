@@ -27,7 +27,7 @@ describe('one hook timeout per hook', () => {
     const trees = {
       'claude-code': timeoutsByModule(JSON.parse(read('dist/claude-code/plugins/lua-agent-builder/hooks/hooks.json')), flat),
       codex: timeoutsByModule(JSON.parse(read('dist/codex/hooks/hooks.json')), flat),
-      cursor: timeoutsByModule(JSON.parse(read('dist/cursor/cursor-hooks.json')), flat),
+      cursor: timeoutsByModule(JSON.parse(read('dist/cursor/hooks/hooks.json')), flat),
     };
     for (const [host, timeouts] of Object.entries(trees)) {
       for (const [module, timeout] of Object.entries(timeouts)) {

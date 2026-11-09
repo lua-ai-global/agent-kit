@@ -1,0 +1,13 @@
+{
+  "name": "lua-agent-builder",
+  "version": "0.0.0",
+  "description": "Safety checks and Lua platform tools for building Lua AI agents in Cursor",
+  "author": {
+    "name": "Lua AI",
+    "email": "support@heylua.ai"
+  },
+  "homepage": "https://github.com/lua-ai-global/agent-kit#readme",
+  "repository": "https://github.com/lua-ai-global/agent-kit",
+  "license": "MIT",
+  "keywords": ["lua", "ai-agents", "deployment", "lua-cli"]
+}
