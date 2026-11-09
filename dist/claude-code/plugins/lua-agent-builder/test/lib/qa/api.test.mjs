@@ -16,7 +16,7 @@ describe('qaApiRequest', () => {
     expect(calls[0].init.headers.Authorization).toBe('Bearer bearer-token-value');
     expect(calls[0].init.headers['X-Lua-Client']).toBe(`claude-plugin-qa/${PLUGIN_VERSION}`);
     expect(calls[0].init.body).toBe('{"a":1}');
-    expect(PLUGIN_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(PLUGIN_VERSION).toMatch(/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/);
   });
   test('a GET has no body; default base URL', async () => {
     let seen;

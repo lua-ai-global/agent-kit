@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      { "command": "node ./hooks/before-shell-execution.mjs", "timeout": 30, "failClosed": true },
+      { "command": "node ./hooks/confirm-deploy.mjs", "timeout": 30, "failClosed": true },
+      { "command": "node ./hooks/block-auto-deploy.mjs", "timeout": 5 },
+      { "command": "node ./hooks/block-device-secret.mjs", "timeout": 5 },
+      { "command": "node ./hooks/approve-web-app.mjs", "timeout": 5 },
+      { "command": "node ./hooks/warn-version-zero.mjs", "timeout": 5 }
+    ]
+  }
+}

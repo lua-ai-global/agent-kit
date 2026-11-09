@@ -1,7 +1,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hostDefault, renderCursorHooks, renderCursorMcp } from '../../build/generators.mjs';
+import { hostDefault, renderCursorHooks, renderCursorMcp, renderManifest } from '../../build/generators.mjs';
 import { applyPairs, loadGlossary } from '../../build/glossary.mjs';
 import { kitReader } from '../../build/readers.mjs';
 
@@ -32,7 +32,7 @@ function hostText(codex, cursor, path, text) {
   return applyPairs(cursor, path, applyPairs(codex, path, text));
 }
 
-export function generate({ root }) {
+export function generate({ root, version }) {
   const reader = kitReader(root);
   const codex = loadGlossary(root, 'codex');
   const cursor = loadGlossary(root, 'cursor');
@@ -47,7 +47,8 @@ export function generate({ root }) {
     ...out,
     { path: 'lib/host-default.mjs', content: hostDefault(root, 'cursor') },
     { path: 'package.json', content: `${JSON.stringify({ name: 'lua-agent-builder-cursor', private: true, type: 'module' }, null, 2)}\n` },
-    { path: 'cursor-hooks.json', content: renderCursorHooks(root) },
-    { path: 'cursor-mcp.json', content: renderCursorMcp(root) },
+    { path: '.cursor-plugin/plugin.json', content: renderManifest(root, 'adapters/cursor/manifests/plugin.json', version) },
+    { path: 'hooks/hooks.json', content: renderCursorHooks(root) },
+    { path: 'mcp.json', content: renderCursorMcp(root) },
   ];
 }

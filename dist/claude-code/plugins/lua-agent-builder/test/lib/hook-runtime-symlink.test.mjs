@@ -51,6 +51,6 @@ describe.each(Object.keys(HOSTS))('the deploy gate behind a symlinked plugin pat
   test('still lets the confirmed form through the symlinked path', () => {
     const r = run(host, linked, 'LUA_DEPLOY_CONFIRMED=1 lua deploy all');
     expect(r.status).toBe(0);
-    expect(r.stdout).toBe('');
+    expect(r.stdout).toBe(host === 'cursor' ? '{}\n' : '');
   });
 });
