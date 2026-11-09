@@ -4,6 +4,7 @@
     "kit-consistency": "One canonical value or rule for every host, decided in the kit (see NOTES.md)."
   },
   "residuals": {
+    "plugins/lua-agent-builder/test/lib/qa/api.test.mjs": { "kind": "content", "category": "kit-fix", "reason": "the plugin version check accepts a prerelease such as 2.0.0-beta.0" },
     "plugins/lua-agent-builder/lib/hook-runtime.mjs": { "kind": "content", "category": "kit-fix", "reason": "one multi-host runtime on every host; isMainScript compares real paths, so a plugin path through a symlink no longer turns every hook, the deploy gate included, into a no-op" },
     "plugins/lua-agent-builder/lib/host.mjs": { "kind": "extra", "category": "kit-fix", "reason": "resolveHost() and the per-host protocols the shared runtime renders through" },
     "plugins/lua-agent-builder/lib/host-default.mjs": { "kind": "extra", "category": "kit-fix", "reason": "the emitted default host (claude-code) and its empty fail-closed list" },
